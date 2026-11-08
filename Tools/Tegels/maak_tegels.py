@@ -66,14 +66,23 @@ def atoom(d, x, y, r, kleur, label=None, font=None):
         d.text((x, y), label, font=font, fill=(255, 255, 255, 255), anchor="mm")
 
 
+def teken_molecuul(d, o, hs, schaal, font=None, labels=False):
+    """Watermolecuul: O-atoom op o, H-atomen op de plekken hs (met O–H-staafjes)."""
+    for (hx, hy) in hs:
+        d.line([o[0], o[1], hx, hy], fill=WIT + (235,), width=max(2, int(8 * schaal)))
+        atoom(d, hx, hy, 13 * schaal, WIT, "H" if labels else None, font)
+    atoom(d, o[0], o[1], 22 * schaal, ROOD, "O" if labels else None, font)
+
+
 def molecuul(d, x, y, schaal, hoek, font=None, labels=True):
-    """H₂O: O in het midden, twee H op 104,5°."""
+    """H2O: O op (x, y), twee H op 104,5°; 'hoek' is de richting midden tussen de twee H-atomen.
+    Geeft de plek van O en van beide H-atomen terug."""
+    hs = []
     for s in (-1, 1):
         a = math.radians(hoek + s * 52.25)
-        hx, hy = x + math.cos(a) * 46 * schaal, y + math.sin(a) * 46 * schaal
-        d.line([x, y, hx, hy], fill=WIT + (230,), width=max(2, int(8 * schaal)))
-        atoom(d, hx, hy, 13 * schaal, WIT, "H" if labels else None, font)
-    atoom(d, x, y, 22 * schaal, ROOD, "O" if labels else None, font)
+        hs.append((x + math.cos(a) * 46 * schaal, y + math.sin(a) * 46 * schaal))
+    teken_molecuul(d, (x, y), hs, schaal, font, labels)
+    return (x, y), hs
 
 
 def brug(d, a, b, dikte=5, streepjes=5):
@@ -82,6 +91,45 @@ def brug(d, a, b, dikte=5, streepjes=5):
         t0, t1 = (i + 0.2) / streepjes, (i + 0.7) / streepjes
         d.line([x1 + (x2 - x1) * t0, y1 + (y2 - y1) * t0, x1 + (x2 - x1) * t1, y1 + (y2 - y1) * t1],
                fill=CYAAN + (255,), width=dikte)
+
+
+def h_brug(d, h, o, rh, ro, dikte=6, streepjes=5):
+    """Waterstofbrug van het H-atoom h naar het O-atoom o (stippellijn tussen de randen van de bolletjes)."""
+    dx, dy = o[0] - h[0], o[1] - h[1]
+    L = math.hypot(dx, dy)
+    ux, uy = dx / L, dy / L
+    brug(d, (h[0] + ux * (rh + 3), h[1] + uy * (rh + 3)), (o[0] - ux * (ro + 3), o[1] - uy * (ro + 3)), dikte, streepjes)
+
+
+def ijsring(d, db, cx, cy, R, schaal, hoeken):
+    """Stuk ijsrooster van hele watermoleculen (ijsregels): elk O-atoom levert één H langs de ring
+    naar het volgende O-atoom (met een H-brug), en het tweede H wijst naar buiten."""
+    pts = [(cx + math.cos(math.radians(a)) * R, cy + math.sin(math.radians(a)) * R) for a in hoeken]
+    oh = 46 * schaal
+    for k, o in enumerate(pts):
+        if k + 1 < len(pts) or len(pts) == 6:
+            nxt = pts[(k + 1) % len(pts)]
+            ex, ey = nxt[0] - o[0], nxt[1] - o[1]
+        else:                                          # laatste van een open stuk: H wijst naar waar de ring verder zou gaan
+            prv = pts[k - 1]
+            ex, ey = o[0] - prv[0], o[1] - prv[1]
+            a = math.atan2(ey, ex) + math.radians(60)
+            ex, ey = math.cos(a), math.sin(a)
+            nxt = None
+        L = math.hypot(ex, ey); ex, ey = ex / L, ey / L
+        h1 = (o[0] + ex * oh, o[1] + ey * oh)
+        # tweede H: 104,5° gedraaid, naar buiten de ring
+        bx, by = o[0] - cx, o[1] - cy
+        beste = None
+        for teken in (1, -1):
+            a = math.atan2(ey, ex) + teken * math.radians(104.5)
+            kand = (math.cos(a), math.sin(a))
+            if beste is None or kand[0] * bx + kand[1] * by > beste[0] * bx + beste[1] * by:
+                beste = kand
+        h2 = (o[0] + beste[0] * oh, o[1] + beste[1] * oh)
+        teken_molecuul(d, o, [h1, h2], schaal)
+        if nxt is not None:
+            h_brug(db, h1, nxt, 13 * schaal, 22 * schaal, max(4, int(7 * schaal)), 3)
 
 
 def tegel(n):
@@ -99,24 +147,31 @@ def tegel(n):
         d.text((cx + 58, cy - 48), "δ−", font=f_klein, fill=(255, 190, 190, 255))
         d.text((cx - 140, cy + 92), "δ+", font=f_klein, fill=(200, 230, 255, 255))
         d.text((cx + 115, cy + 92), "δ+", font=f_klein, fill=(200, 230, 255, 255))
-    elif n == 2:    # twee moleculen met een H-brug
-        molecuul(d, cx - 120, cy + 10, 1.3, 20, f_klein)
-        molecuul(d, cx + 110, cy - 20, 1.3, 200, f_klein)
-        brug(db, (cx - 70, cy + 30), (cx + 85, cy - 20), 7, 6)
-    elif n == 3:    # zeshoek uit het ijsrooster
-        pts = [(cx + math.cos(math.radians(60 * k + 30)) * 120, cy + math.sin(math.radians(60 * k + 30)) * 120) for k in range(6)]
-        for k in range(6):
-            brug(db, pts[k], pts[(k + 1) % 6], 6, 4)
-        for (x, y) in pts:
-            atoom(d, x, y, 16, ROOD)
-    elif n == 4:    # rooster dat uit elkaar valt
-        pts = [(cx - 60 + math.cos(math.radians(60 * k + 30)) * 90, cy + math.sin(math.radians(60 * k + 30)) * 90) for k in range(6)]
-        for k in range(3):
-            brug(db, pts[k], pts[(k + 1) % 6], 6, 3)
-        for (x, y) in pts:
-            atoom(d, x, y, 13, ROOD)
-        for i, (x, y, h) in enumerate([(cx + 120, cy - 70, 20), (cx + 150, cy + 40, 140), (cx + 70, cy + 120, 260)]):
-            molecuul(d, x, y, 0.8, h, labels=False)
+    elif n == 2:    # H-brug: van een H-atoom van het ene molecuul naar het O-atoom van het andere
+        s = 1.3
+        o1, hs1 = molecuul(d, cx - 160, cy + 40, s, 37, f_klein)
+        h = hs1[0]                                         # dit H wijst naar het andere molecuul
+        ux, uy = h[0] - o1[0], h[1] - o1[1]
+        L = math.hypot(ux, uy); ux, uy = ux / L, uy / L
+        o2 = (h[0] + ux * 150, h[1] + uy * 150)
+        molecuul(d, o2[0], o2[1], s, math.degrees(math.atan2(uy, ux)), f_klein)
+        h_brug(db, h, o2, 13 * s, 22 * s, 10, 6)
+    elif n == 3:    # zeshoek uit het ijsrooster, van hele watermoleculen
+        ijsring(d, db, cx, cy, 112, 0.72, [60 * k + 30 for k in range(6)])
+    elif n == 4:    # smelten: links nog ijs, rechts losgekomen, dicht opeengepakte watermoleculen
+        ijsring(d, db, cx - 70, cy - 5, 78, 0.55, [90, 150, 210, 270])
+        los = [(cx + 70, cy - 70, 200), (cx + 125, cy - 15, 300), (cx + 60, cy + 10, 40),
+               (cx + 120, cy + 60, 160), (cx + 55, cy + 85, 250), (cx + 5, cy + 60, 110), (cx + 165, cy + 25, 20)]
+        mols = [molecuul(d, x, y, 0.55, h, labels=False) for (x, y, h) in los]
+        for i, (o, hs) in enumerate(mols):                  # een paar korte H-bruggen in de vloeistof
+            for hp in hs:
+                for j, (o2, _) in enumerate(mols):
+                    if i == j: continue
+                    vx, vy = o2[0] - hp[0], o2[1] - hp[1]
+                    afst = math.hypot(vx, vy)
+                    rx, ry = hp[0] - o[0], hp[1] - o[1]
+                    if afst < 58 and (vx * rx + vy * ry) / (afst * math.hypot(rx, ry)) > 0.8:
+                        h_brug(db, hp, o2, 13 * 0.55, 22 * 0.55, 4, 2)
     elif n == 5:    # bekerglas met drijvend ijsblokje
         bx, by, bw, bh = cx - 110, cy - 90, 220, 200
         d.rectangle([bx, by + 70, bx + bw, by + bh], fill=(60, 150, 255, 110))
@@ -124,11 +179,19 @@ def tegel(n):
         d.rectangle([bx + 70, by + 40, bx + 140, by + 100], fill=(225, 245, 255, 235), outline=CYAAN + (255,), width=4)
         d.line([bx, by + 70, bx + bw, by + 70], fill=CYAAN + (255,), width=4)
         d.text((bx + bw + 14, by + 60), "ρ", font=f_groot, fill=(255, 255, 255, 255))
-    elif n == 6:    # koken: belletjes en losse moleculen
-        for (x, y, r) in [(cx - 90, cy + 80, 26), (cx + 20, cy + 40, 18), (cx + 100, cy + 100, 30), (cx - 20, cy - 40, 14)]:
+    elif n == 6:    # koken: dicht water onderin met belletjes; hele moleculen komen los en stijgen op
+        opp = cy + 25
+        d.line([cx - 175, opp, cx + 175, opp], fill=CYAAN + (220,), width=4)
+        for (x, y, r) in [(cx - 40, cy + 95, 24), (cx + 95, cy + 120, 17)]:
             d.ellipse([x - r, y - r, x + r, y + r], outline=CYAAN + (255,), width=4)
-        for (x, y, h) in [(cx - 120, cy - 80, 30), (cx + 110, cy - 60, 200), (cx + 30, cy - 130, 110)]:
-            molecuul(d, x, y, 0.75, h, labels=False)
+        for (x, y, h) in [(cx - 140, cy + 60, 20), (cx - 95, cy + 105, 250), (cx + 20, cy + 60, 130),
+                          (cx + 60, cy + 115, 330), (cx + 140, cy + 70, 200), (cx - 150, cy + 130, 90), (cx + 165, cy + 130, 60)]:
+            molecuul(d, x, y, 0.6, h, labels=False)
+        for (x, y, h) in [(cx - 90, cy - 60, 300), (cx + 60, cy - 105, 210), (cx + 140, cy - 30, 30)]:
+            molecuul(d, x, y, 0.62, h, labels=False)
+            for k in range(1, 4):                               # spoortje: hij komt uit het water
+                rr = 5 - k
+                d.ellipse([x - rr, y + 26 + k * 16 - rr, x + rr, y + 26 + k * 16 + rr], fill=CYAAN + (220 - 55 * k,))
 
     bruggen = gloed(bruggen, 6)
     tek = gloed(tek, 5)
