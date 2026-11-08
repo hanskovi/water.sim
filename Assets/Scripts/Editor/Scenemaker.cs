@@ -75,9 +75,11 @@ namespace WaterSim.Editor
             k.rand = rand; k.niveau = niveau;
             k.achtergrond = Achtergrond;
             camGo.AddComponent<WaterSim.UI.Snelheidsmeter>().kristal = k;
-            var paneel = camGo.AddComponent<WaterSim.UI.Testpaneel>();
-            paneel.kristal = k;
-            paneel.vliegcamera = camGo.GetComponent<Vliegcamera>();
+            var app = new GameObject("App").AddComponent<WaterSim.UI.AppSchil>();
+            app.kristal = k;
+            app.vliegcamera = camGo.GetComponent<Vliegcamera>();
+            app.ubuntuRegular = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/Ubuntu/Ubuntu-Regular.ttf");
+            app.ubuntuVet = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/Ubuntu/Ubuntu-Bold.ttf");
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Flat;

@@ -4,6 +4,8 @@
     "references": [
         "WaterSim.Sim",
         "Unity.InputSystem",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI",
         "Unity.RenderPipelines.Core.Runtime",
         "Unity.RenderPipelines.Universal.Runtime"
     ],

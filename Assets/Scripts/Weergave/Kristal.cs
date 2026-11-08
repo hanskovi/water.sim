@@ -104,6 +104,15 @@ namespace WaterSim.Weergave
             cam = Camera.main;
         }
 
+        /// <summary>Begint opnieuw: vers ijs (of water) op <paramref name="startT"/> °C, met de omgeving op dezelfde temperatuur.</summary>
+        public void Herstart(float startT, bool alsOneindig)
+        {
+            startTemperatuur = startT;
+            temperatuurOmgeving = startT;
+            oneindig = alsOneindig;
+            Model = new Watermodel(nx, ny, nz, zaad, startT) { Oneindig = alsOneindig };
+        }
+
         void OnDestroy()
         {
             if (brugGroep == null) return;

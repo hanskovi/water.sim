@@ -21,7 +21,7 @@ namespace WaterSim.UI
 
         void Start()
         {
-            if (!Application.isEditor && !Debug.isDebugBuild) zichtbaar = false;
+            zichtbaar = false;   // aanzetten met F of drie vingers (alleen editor en development builds)
             if (kristal == null) kristal = FindAnyObjectByType<Kristal>();
         }
 
@@ -32,6 +32,7 @@ namespace WaterSim.UI
             slechtste = Mathf.Max(slechtste, dt);
             if ((slechtsteTimer += dt) > 2f) { slechtsteTimer = 0f; slechtste = dt; }
 
+            if (!Application.isEditor && !Debug.isDebugBuild) return;
             if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) zichtbaar = !zichtbaar;
             var scherm = Touchscreen.current;
             if (scherm != null)
@@ -63,7 +64,7 @@ namespace WaterSim.UI
                 tekst += $"\nsimulatie {kristal.SimulatieMs:0.0} ms · tekenen {kristal.RekentijdMs:0.0} ms · {kristal.ZichtbareMoleculen} moleculen";
             var maat = stijl.CalcSize(new GUIContent(tekst.Replace("<b>", "").Replace("</b>", "")));
             float marge = 10f * schaal + Screen.safeArea.xMin;
-            GUI.Box(new Rect(marge, 10f * schaal + (Screen.height - Screen.safeArea.yMax), maat.x + 16 * schaal, maat.y + 10 * schaal), tekst, stijl);
+            GUI.Box(new Rect(marge, 64f * schaal + (Screen.height - Screen.safeArea.yMax), maat.x + 16 * schaal, maat.y + 10 * schaal), tekst, stijl);
         }
     }
 }
