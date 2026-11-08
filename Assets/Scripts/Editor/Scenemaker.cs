@@ -70,6 +70,7 @@ namespace WaterSim.Editor
             k.capsule = Resources.GetBuiltinResource<Mesh>("Capsule.fbx");
             k.zuurstof = zuurstof; k.kanaal = kanaal; k.waterstof = waterstof; k.staaf = staaf; k.brug = brug;
             k.achtergrond = Achtergrond;
+            camGo.AddComponent<WaterSim.UI.Snelheidsmeter>().kristal = k;
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Flat;
