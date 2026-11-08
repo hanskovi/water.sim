@@ -21,7 +21,22 @@ namespace WaterSim.Besturing
         [Tooltip("Å per scrollstap.")]
         public float scrollStap = 0.6f;
 
+        /// <summary>Geeft true als een schermpunt (pixels, oorsprong linksonder) op een knop of paneel ligt;
+        /// aanrakingen die daar beginnen, sturen de camera niet.</summary>
+        public static System.Predicate<Vector2> OpUI;
+
         float yaw, pitch;
+        bool muisOpUI;
+
+        /// <summary>Zet de camera op <paramref name="positie"/>, kijkend naar <paramref name="kijkNaar"/>.</summary>
+        public void Zet(Vector3 positie, Vector3 kijkNaar)
+        {
+            transform.position = positie;
+            var r = Quaternion.LookRotation(kijkNaar - positie, Vector3.up).eulerAngles;
+            yaw = r.y;
+            pitch = r.x > 180f ? r.x - 360f : r.x;
+            transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+        }
 
         void Start()
         {
@@ -45,18 +60,21 @@ namespace WaterSim.Besturing
                 foreach (var t in scherm.touches)
                 {
                     if (!t.press.isPressed) continue;
+                    if (OpUI != null && OpUI(t.startPosition.ReadValue())) { aanraking = true; continue; }
                     vingers++;
                     som += t.delta.ReadValue();
                 }
                 if (vingers == 1) kijk += som;
                 else if (vingers >= 2) beweeg.z += som.y / vingers * vingerVlieg;
-                aanraking = vingers > 0;
+                aanraking |= vingers > 0;
             }
 
             var muis = Mouse.current;
             if (muis != null && !aanraking)
             {
-                if (muis.leftButton.isPressed || muis.rightButton.isPressed) kijk += muis.delta.ReadValue();
+                if (muis.leftButton.wasPressedThisFrame || muis.rightButton.wasPressedThisFrame)
+                    muisOpUI = OpUI != null && OpUI(muis.position.ReadValue());
+                if ((muis.leftButton.isPressed || muis.rightButton.isPressed) && !muisOpUI) kijk += muis.delta.ReadValue();
                 float scroll = muis.scroll.ReadValue().y;
                 if (Mathf.Abs(scroll) > 0.01f) beweeg.z += Mathf.Sign(scroll) * scrollStap;
             }

@@ -6,11 +6,11 @@ using WaterSim.Sim;
 namespace WaterSim.Weergave
 {
     /// <summary>
-    /// Tekent het ijskristal als een oneindig rooster rond de camera.
+    /// Laat het <see cref="Watermodel"/> zien: ijs, smelten, vloeibaar water en weer bevriezen.
     ///
-    /// Elk molecuul wordt getekend op de kopie van het (periodieke) blok die het dichtst bij de camera ligt.
-    /// Wat verder weg ligt dan de nevel, wordt niet getekend. De nevel loopt af naar de achtergrondkleur,
-    /// zodat het rooster in de verte in het donker verdwijnt en je het verspringen nooit ziet.
+    /// Oneindig: elk molecuul wordt getekend op de kopie van het periodieke blok die het dichtst bij de camera
+    /// ligt; alles buiten de nevel wordt overgeslagen. Los blok: het blok staat los in de ruimte, met een
+    /// stippellijn-kader voor het volume van het ijs en een blauwe lijn voor het waterniveau.
     ///
     /// Alles wordt met GPU-instancing getekend: één tekenopdracht per soort onderdeel.
     /// </summary>
@@ -22,17 +22,22 @@ namespace WaterSim.Weergave
         public int zaad = 1;
 
         [Header("Temperatuur")]
-        [Range(-200, 0)] public float temperatuur = -10f;
-        [Tooltip("Trilling van de moleculen (2× vergroot, anders zie je haar niet).")]
+        [Tooltip("Temperatuur van de omgeving. Het water warmt op of koelt af naar deze temperatuur.")]
+        [Range(-100, 99)] public float temperatuurOmgeving = -10f;
+        public float startTemperatuur = -10f;
+        [Tooltip("Trilling en warmtebeweging (trilling van ijs 2× vergroot).")]
         public bool beweging = true;
+
+        [Header("Ruimte")]
+        [Tooltip("Aan: het rooster herhaalt zich in alle richtingen. Uit: een los blok, waarin je ziet dat water krimpt.")]
+        public bool oneindig = true;
 
         [Header("Weergave")]
         public bool kalotten = false;
         public bool toonWaterstof = true;
         public bool toonBruggen = true;
         public bool markeerKanaal = false;
-        [Tooltip("Bij kalotten: moleculen binnen deze afstand van de camera (Å) worden weggelaten, " +
-                 "zodat je vanuit een lege bel naar het rooster kijkt.")]
+        [Tooltip("Bij kalotten: moleculen binnen deze afstand van de camera (Å) worden weggelaten.")]
         [Range(0f, 10f)] public float doorkijkStraal = 5f;
 
         [Header("Pulseren van de H-bruggen")]
@@ -53,31 +58,25 @@ namespace WaterSim.Weergave
         public Mesh bol;
         public Mesh cilinder;
         public Mesh capsule;
-        public Material zuurstof, kanaal, waterstof, staaf, brug;
+        public Material zuurstof, kanaal, waterstof, staaf, brug, rand, niveau;
 
-        public IJsrooster Rooster { get; private set; }
+        public Watermodel Model { get; private set; }
         /// <summary>Aantal moleculen dat dit beeld getekend is.</summary>
         public int ZichtbareMoleculen { get; private set; }
-        /// <summary>Tijd die het opbouwen van dit beeld op de processor kostte (ms).</summary>
+        /// <summary>Tijd voor tekenen (matrices) dit beeld, in ms.</summary>
         public float RekentijdMs { get; private set; }
+        /// <summary>Tijd voor de simulatie dit beeld, in ms.</summary>
+        public float SimulatieMs { get; private set; }
 
         const int BrugStreepjes = 4;
-        // De bruggen zijn verdeeld over een paar groepen met elk een eigen materiaal; elke groep pulseert
-        // in een andere fase. Zo knippert het netwerk zacht, zonder eigen shader.
         const int PulsGroepen = 6;
         const float AfstandOH = (float)Constanten.AfstandOH;
 
-        float lx, ly, lz;
-        float[] ox, oy, oz;          // roosterplekken
-        float[] hx, hy, hz;          // richtingen van de H-atomen [i*2+k]
-        int[] acceptor;              // per H: het O-atoom dat de brug ontvangt
         bool[] inKanaal;
-        float[] fase, freq;
-        float[] px, py, pz;          // huidige posities (met trilling)
-
         Matrix4x4[] mO, mK, mH, mS;
         int nO, nK, nH, nS;
         readonly List<Matrix4x4>[] mB = new List<Matrix4x4>[PulsGroepen];
+        readonly List<Matrix4x4> mRand = new List<Matrix4x4>(), mNiveau = new List<Matrix4x4>();
         Material[] brugGroep;
         Color brugKleur;
         Camera cam;
@@ -88,25 +87,10 @@ namespace WaterSim.Weergave
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = beeldenPerSeconde;
 
-            Rooster = new IJsrooster(nx, ny, nz);
-            IJsregels.Pas(Rooster, zaad);
-            IJsregels.HAtomen(Rooster, out var dhx, out var dhy, out var dhz, out acceptor, out _);
-
-            int n = Rooster.Aantal;
-            lx = (float)Rooster.Lx; ly = (float)Rooster.Ly; lz = (float)Rooster.Lz;
-            ox = new float[n]; oy = new float[n]; oz = new float[n];
-            px = new float[n]; py = new float[n]; pz = new float[n];
-            hx = new float[2 * n]; hy = new float[2 * n]; hz = new float[2 * n];
+            Model = new Watermodel(nx, ny, nz, zaad, startTemperatuur) { Oneindig = oneindig };
+            int n = Model.N;
             inKanaal = new bool[n];
-            fase = new float[3 * n]; freq = new float[3 * n];
-            var rnd = new System.Random(zaad);
-            for (int i = 0; i < n; i++)
-            {
-                ox[i] = (float)Rooster.X[i]; oy[i] = (float)Rooster.Y[i]; oz[i] = (float)Rooster.Z[i];
-                inKanaal[i] = Mathf.Sqrt(ox[i] * ox[i] + oy[i] * oy[i]) < 3.2f;
-                for (int a = 0; a < 3; a++) { fase[3 * i + a] = (float)(rnd.NextDouble() * 6.283); freq[3 * i + a] = 7f + (float)rnd.NextDouble() * 5f; }
-            }
-            for (int k = 0; k < 2 * n; k++) { hx[k] = (float)dhx[k]; hy[k] = (float)dhy[k]; hz[k] = (float)dhz[k]; }
+            for (int i = 0; i < n; i++) inKanaal[i] = Mathf.Sqrt(Model.X[i] * Model.X[i] + Model.Y[i] * Model.Y[i]) < 3.2f;
 
             mO = new Matrix4x4[n]; mK = new Matrix4x4[n];
             mH = new Matrix4x4[2 * n]; mS = new Matrix4x4[2 * n];
@@ -126,92 +110,118 @@ namespace WaterSim.Weergave
             foreach (var m in brugGroep) if (m != null) Destroy(m);
         }
 
+        void Update()
+        {
+            klok.Restart();
+            Model.Oneindig = oneindig;
+            Model.Beweging = beweging;
+            Model.Stap(Time.deltaTime, temperatuurOmgeving);
+            SimulatieMs = (float)klok.Elapsed.TotalMilliseconds;
+        }
+
         void LateUpdate()
         {
             if (cam == null) cam = Camera.main;
             if (cam == null) return;
             klok.Restart();
 
-            // --- nevel: zo instellen dat alles wat we niet tekenen, al helemaal in de nevel zit ---
-            float hoek = HoekNaarSchermhoek(cam);
-            float halfBlok = Mathf.Min(lx, Mathf.Min(ly, lz)) / 2f;
-            float tekenStraal = Mathf.Min(nevelEind * hoek + 1f, halfBlok - 3.5f);
-            float eind = Mathf.Min(nevelEind, (tekenStraal - 1f) / hoek);
+            Vector3 c = cam.transform.position;
+            float lx = Model.Lx, ly = Model.Ly, lz = Model.Lz;
+
+            // --- nevel ---
+            float tekenStraal;
+            if (oneindig)
+            {
+                // zo instellen dat alles wat we niet tekenen, al helemaal in de nevel zit (ook in de hoeken)
+                float hoek = HoekNaarSchermhoek(cam);
+                float halfBlok = Mathf.Min(lx, Mathf.Min(ly, lz)) / 2f;
+                tekenStraal = Mathf.Min(nevelEind * hoek + 1f, halfBlok - 3.5f);
+                float eind = Mathf.Min(nevelEind, (tekenStraal - 1f) / hoek);
+                RenderSettings.fogStartDistance = Mathf.Min(nevelStart, eind - 1f);
+                RenderSettings.fogEndDistance = eind;
+            }
+            else
+            {
+                float afstand = c.magnitude;
+                tekenStraal = float.MaxValue;
+                RenderSettings.fogStartDistance = Mathf.Max(12f, afstand - 25f);
+                RenderSettings.fogEndDistance = Mathf.Max(70f, afstand + 45f);
+            }
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = achtergrond;
-            RenderSettings.fogStartDistance = Mathf.Min(nevelStart, eind - 1f);
-            RenderSettings.fogEndDistance = eind;
             cam.backgroundColor = achtergrond;
 
-            // --- trilling ---
+            // --- matrices ---
             float t = Time.time;
-            float amp = beweging ? 2f * 0.15f * Mathf.Sqrt((temperatuur + 273.15f) / 273.15f) : 0f;
-            int n = ox.Length;
-            for (int i = 0; i < n; i++)
-            {
-                px[i] = ox[i] + amp * Mathf.Sin(t * freq[3 * i] + fase[3 * i]);
-                py[i] = oy[i] + amp * Mathf.Sin(t * freq[3 * i + 1] + fase[3 * i + 1]);
-                pz[i] = oz[i] + amp * Mathf.Sin(t * freq[3 * i + 2] + fase[3 * i + 2]);
-            }
-
-            // --- matrices voor alles binnen de tekenstraal ---
-            Vector3 c = cam.transform.position;
-            float r2 = tekenStraal * tekenStraal;
-            // Kalotten: iets kleiner dan van der Waals (O 1,52 / H 1,2 Å), anders past de camera niet
-            // in een kanaal. Moleculen die de camera raken, laten we weg ("doorkijk").
+            float r2 = tekenStraal < float.MaxValue ? tekenStraal * tekenStraal : float.MaxValue;
             float rO = kalotten ? 1.25f : 0.36f, rH = kalotten ? 0.95f : 0.20f;
             float dichtbij = kalotten ? doorkijkStraal : 0f, dichtbij2 = dichtbij * dichtbij;
+            var X = Model.X; var Y = Model.Y; var Z = Model.Z; var H = Model.H; var acc = Model.Acceptor;
             nO = nK = nH = nS = 0;
             for (int g = 0; g < PulsGroepen; g++) mB[g].Clear();
-            int zichtbaar = 0;
+            int zichtbaar = 0, n = Model.N;
             for (int i = 0; i < n; i++)
             {
-                float x = c.x + Kortst(px[i] - c.x, lx);
-                float y = c.y + Kortst(py[i] - c.y, ly);
-                float z = c.z + Kortst(pz[i] - c.z, lz);
+                float x = X[i], y = Y[i], z = Z[i];
+                if (oneindig) { x = c.x + Watermodel.Kortst(x - c.x, lx); y = c.y + Watermodel.Kortst(y - c.y, ly); z = c.z + Watermodel.Kortst(z - c.z, lz); }
                 float dx = x - c.x, dy = y - c.y, dz = z - c.z;
                 float d2 = dx * dx + dy * dy + dz * dz;
                 if (d2 > r2 || d2 < dichtbij2) continue;
                 zichtbaar++;
                 var o = new Vector3(x, y, z);
 
-                if (markeerKanaal && inKanaal[i]) mK[nK++] = Bol(o, rO); else mO[nO++] = Bol(o, rO);
+                if (markeerKanaal && inKanaal[i] && !Model.Vloeibaar[i]) mK[nK++] = Bol(o, rO); else mO[nO++] = Bol(o, rO);
 
                 for (int k = 0; k < 2; k++)
                 {
-                    int h = 2 * i + k;
-                    var hp = o + new Vector3(hx[h], hy[h], hz[h]) * AfstandOH;
+                    int h = 6 * i + 3 * k;
+                    var hp = o + new Vector3(H[h], H[h + 1], H[h + 2]) * AfstandOH;
                     if (toonWaterstof)
                     {
                         mH[nH++] = Bol(hp, rH);
                         if (!kalotten) mS[nS++] = Staaf(o, hp, 0.09f);
                     }
                     if (!toonBruggen || kalotten) continue;
-                    int j = acceptor[h];
-                    var ap = o + new Vector3(Kortst(px[j] - px[i], lx), Kortst(py[j] - py[i], ly), Kortst(pz[j] - pz[i], lz));
-                    Streepjes(hp, ap, mB[(int)((uint)(h * 2654435761u) >> 16) % PulsGroepen]);
+                    int j = acc[2 * i + k];
+                    if (j < 0) continue;
+                    float ax = X[j] - X[i], ay = Y[j] - Y[i], az = Z[j] - Z[i];
+                    if (oneindig) { ax = Watermodel.Kortst(ax, lx); ay = Watermodel.Kortst(ay, ly); az = Watermodel.Kortst(az, lz); }
+                    int brugNr = 2 * i + k;
+                    Streepjes(hp, o + new Vector3(ax, ay, az), mB[(int)((uint)(brugNr * 2654435761u) >> 16) % PulsGroepen]);
                 }
             }
             ZichtbareMoleculen = zichtbaar;
+
+            // --- kader van het ijsvolume en het waterniveau (alleen los blok) ---
+            mRand.Clear(); mNiveau.Clear();
+            if (!oneindig)
+            {
+                Kader(mRand, new Vector3(lx, ly, lz) * 0.5f, 0.08f);
+                if (Model.Fase.Gesmolten > 0.02) Niveau(mNiveau, lx * 0.5f, lz * 0.5f, Model.Bovenkant, 0.1f);
+            }
 
             Teken(bol, zuurstof, mO, nO);
             Teken(bol, kanaal, mK, nK);
             Teken(bol, waterstof, mH, nH);
             Teken(cilinder, staaf, mS, nS);
+            Teken(cilinder, rand, mRand);
+            Teken(cilinder, niveau, mNiveau);
             if (brugGroep != null)
                 for (int g = 0; g < PulsGroepen; g++)
                 {
                     float f = pulseren ? 1f + pulsSterkte * Mathf.Sin(t * pulsSnelheid + g * (2f * Mathf.PI / PulsGroepen)) : 1f;
-                    var kleur = new Color(brugKleur.r * f, brugKleur.g * f, brugKleur.b * f, brugKleur.a);
-                    brugGroep[g].SetColor("_BaseColor", kleur);
+                    brugGroep[g].SetColor("_BaseColor", new Color(brugKleur.r * f, brugKleur.g * f, brugKleur.b * f, brugKleur.a));
                     Teken(capsule, brugGroep[g], mB[g]);
                 }
             RekentijdMs = (float)klok.Elapsed.TotalMilliseconds;
         }
 
+        /// <summary>Waar de camera in een los blok goed staat om het hele blok te zien.</summary>
+        public Vector3 BlokKijkpunt => new Vector3(Model.Lx * 0.5f + 30f, 16f, Model.Lz * 0.5f + 34f);
+
         // gestippelde H-brug van het H-atoom naar de acceptor: 4 neon-pilletjes
-        void Streepjes(Vector3 h, Vector3 a, List<Matrix4x4> lijst)
+        static void Streepjes(Vector3 h, Vector3 a, List<Matrix4x4> lijst)
         {
             var v = a - h;
             float L = v.magnitude;
@@ -225,6 +235,29 @@ namespace WaterSim.Weergave
             }
         }
 
+        // 12 ribben van een balk rond de oorsprong (halve maten hm)
+        static void Kader(List<Matrix4x4> lijst, Vector3 hm, float r)
+        {
+            for (int a = 0; a < 3; a++)
+                for (int s1 = -1; s1 <= 1; s1 += 2)
+                    for (int s2 = -1; s2 <= 1; s2 += 2)
+                    {
+                        Vector3 p = Vector3.zero, q = Vector3.zero;
+                        int b = (a + 1) % 3, c = (a + 2) % 3;
+                        p[a] = -hm[a]; q[a] = hm[a];
+                        p[b] = q[b] = s1 * hm[b];
+                        p[c] = q[c] = s2 * hm[c];
+                        lijst.Add(Staaf(p, q, r));
+                    }
+        }
+
+        static void Niveau(List<Matrix4x4> lijst, float hx, float hz, float y, float r)
+        {
+            var a = new Vector3(-hx, y, -hz); var b = new Vector3(hx, y, -hz);
+            var c = new Vector3(hx, y, hz); var d = new Vector3(-hx, y, hz);
+            lijst.Add(Staaf(a, b, r)); lijst.Add(Staaf(b, c, r)); lijst.Add(Staaf(c, d, r)); lijst.Add(Staaf(d, a, r));
+        }
+
         static Matrix4x4 Bol(Vector3 p, float straal) => Matrix4x4.TRS(p, Quaternion.identity, Vector3.one * (2f * straal));
 
         // Unity-cilinder en -capsule: hoogte 2, straal 0,5, langs y
@@ -236,15 +269,17 @@ namespace WaterSim.Weergave
             return Matrix4x4.TRS((a + b) * 0.5f, rot, new Vector3(2f * straal, L * 0.5f, 2f * straal));
         }
 
+        RenderParams Params(Material mat) => new RenderParams(mat)
+        {
+            shadowCastingMode = ShadowCastingMode.Off,
+            receiveShadows = false,
+            worldBounds = new Bounds(Vector3.zero, Vector3.one * 100000f),
+        };
+
         void Teken(Mesh mesh, Material mat, Matrix4x4[] lijst, int aantal)
         {
             if (aantal == 0 || mesh == null || mat == null) return;
-            var rp = new RenderParams(mat)
-            {
-                shadowCastingMode = ShadowCastingMode.Off,
-                receiveShadows = false,
-                worldBounds = new Bounds(cam.transform.position, Vector3.one * 200f),
-            };
+            var rp = Params(mat);
             for (int s = 0; s < aantal; s += 1023)
                 Graphics.RenderMeshInstanced(rp, mesh, 0, lijst, Mathf.Min(1023, aantal - s), s);
         }
@@ -253,17 +288,10 @@ namespace WaterSim.Weergave
         {
             int aantal = lijst.Count;
             if (aantal == 0 || mesh == null || mat == null) return;
-            var rp = new RenderParams(mat)
-            {
-                shadowCastingMode = ShadowCastingMode.Off,
-                receiveShadows = false,
-                worldBounds = new Bounds(cam.transform.position, Vector3.one * 200f),
-            };
+            var rp = Params(mat);
             for (int s = 0; s < aantal; s += 1023)
                 Graphics.RenderMeshInstanced(rp, mesh, 0, lijst, Mathf.Min(1023, aantal - s), s);
         }
-
-        static float Kortst(float d, float L) => d - L * Mathf.Round(d / L);
 
         // Hoeveel verder de hoek van het beeld ligt dan het midden: afstand / diepte in de beeldhoek.
         static float HoekNaarSchermhoek(Camera c)

@@ -60,7 +60,7 @@ namespace WaterSim.UI
             string kleur = fps >= 55 ? "#7be07a" : fps >= 30 ? "#f2c64a" : "#ff6b6b";
             string tekst = $"<color={kleur}><b>{fps:0} fps</b></color>  {gemiddeld * 1000f:0.0} ms  (traagst {slechtste * 1000f:0} ms)";
             if (kristal != null)
-                tekst += $"\nkristal: {kristal.RekentijdMs:0.0} ms rekenen · {kristal.ZichtbareMoleculen} moleculen";
+                tekst += $"\nsimulatie {kristal.SimulatieMs:0.0} ms · tekenen {kristal.RekentijdMs:0.0} ms · {kristal.ZichtbareMoleculen} moleculen";
             var maat = stijl.CalcSize(new GUIContent(tekst.Replace("<b>", "").Replace("</b>", "")));
             float marge = 10f * schaal + Screen.safeArea.xMin;
             GUI.Box(new Rect(marge, 10f * schaal + (Screen.height - Screen.safeArea.yMax), maat.x + 16 * schaal, maat.y + 10 * schaal), tekst, stijl);

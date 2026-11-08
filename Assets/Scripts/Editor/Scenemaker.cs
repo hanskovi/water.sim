@@ -35,6 +35,9 @@ namespace WaterSim.Editor
             // HDR-blauw (> 1) zodat alleen de H-bruggen door de bloom gaan gloeien
             var brug = Materiaal("Waterstofbrug", unlit, new Color(0.30f, 0.72f, 2.6f, 0.85f), 0f);
             Doorzichtig(brug);
+            var rand = Materiaal("Ijsvolume", unlit, new Color(0.62f, 0.70f, 0.76f, 0.55f), 0f);
+            Doorzichtig(rand);
+            var niveau = Materiaal("Waterniveau", unlit, new Color(0.40f, 0.90f, 2.0f, 1f), 0f);
 
             var profiel = Bloomprofiel();
 
@@ -69,8 +72,12 @@ namespace WaterSim.Editor
             k.cilinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
             k.capsule = Resources.GetBuiltinResource<Mesh>("Capsule.fbx");
             k.zuurstof = zuurstof; k.kanaal = kanaal; k.waterstof = waterstof; k.staaf = staaf; k.brug = brug;
+            k.rand = rand; k.niveau = niveau;
             k.achtergrond = Achtergrond;
             camGo.AddComponent<WaterSim.UI.Snelheidsmeter>().kristal = k;
+            var paneel = camGo.AddComponent<WaterSim.UI.Testpaneel>();
+            paneel.kristal = k;
+            paneel.vliegcamera = camGo.GetComponent<Vliegcamera>();
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Flat;

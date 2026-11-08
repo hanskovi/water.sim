@@ -16,6 +16,10 @@ cp "$NU" Tools/Testdraaier/runner.runtimeconfig.json $T/
 ```
 
 - Bestaat het Unity-pad niet meer, zoek het dan met `ps -o command= -p $(pgrep -x Unity)`.
+- Unity-code (Weergave, Besturing, UI, Editor) compileer je met de verwijzingen uit Unity's eigen
+  responsbestand: `find Library/Bee -name WaterSim.rsp` (neem de nieuwste). Haal daar de regels
+  `-r:`/`-define:`/`-langversion`/`-nowarn` uit (zonder WaterSim-verwijzingen), voeg `-r:sim.dll` toe, en
+  voor de Editor-map ook `$S/Managed/UnityEngine/UnityEditor*.dll`.
 - Meld errors met bestand:regel, en per test OK of FOUT.
 - De runner is een snelle controle. De echte uitslag blijft de Test Runner in Unity:
   Window › General › Test Runner › EditMode › Run All.
