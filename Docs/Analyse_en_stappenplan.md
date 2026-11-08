@@ -190,6 +190,24 @@ browser van een Quest draaien, in een paar uur werk. Zo test je bewegingsziekte 
 
 ---
 
+## Voortgang
+
+| Fase | Status |
+|---|---|
+| 0. Opzet | klaar |
+| 1. Kern (ijsrooster + ijsregels) | klaar — 21 tests |
+| 2. Weergave | klaar — 60 fps op Android |
+| 3. Smelten | klaar — energiemodel, vloeistof, los blok; werkt op Android |
+| 4. App-schil | volgende |
+
+### Later afstemmen (bewust uitgesteld)
+
+- **Kalotten:** beeld van dichtbij is nog rommelig; doorkijkbel (5 Å) is een eerste oplossing.
+- **Details van het smelten en de vloeistof:** hoe het smeltfront eruitziet, hoe snel moleculen
+  bewegen, wat er precies in beeld gebeurt bij de overgang ijs ↔ water.
+- **Eerste keer laden in de editor:** shaders compileren dan even (in een build niet).
+- **Testpaneel en snelheidsmeter** zijn tijdelijk; de echte bediening komt in fase 4.
+
 ## Gemaakte keuzes (8 november 2026)
 
 1. **Platforms:** iOS + Android (telefoons en tablets), zoals C.chem. Geen WebGL-build.
