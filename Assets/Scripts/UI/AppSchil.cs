@@ -29,12 +29,12 @@ namespace WaterSim.UI
 
         // ---------- kleuren (zoals C.chem, "naamgeving"-identiteit) ----------
         static readonly Color Achtergrond = Hex("12122A");
-        static readonly Color Tegel = Hex("1C2050");
+        static readonly Color Tegel = new Color(0.11f, 0.125f, 0.31f, 0.92f);   // #1C2050, iets doorzichtig op de lagune
         static readonly Color Pil = Hex("141836");
-        static readonly Color Strook = Hex("0D1030");
+        static readonly Color Strook = new Color(0.05f, 0.063f, 0.19f, 0.88f);
         static readonly Color PilActief = Hex("4A3430");
         static readonly Color PilActiefTekst = Hex("F2C76A");
-        static readonly Color Kaart = Hex("1B2142");
+        static readonly Color Kaart = new Color(0.106f, 0.13f, 0.26f, 0.92f);
         static readonly Color Paneel = new Color(0.07f, 0.07f, 0.16f, 0.88f);
         static readonly Color Check = Hex("79E07A");
         static readonly Color CheckTekst = Hex("173D18");
@@ -59,8 +59,6 @@ namespace WaterSim.UI
         static readonly int[] Snelknoppen = { -20, -5, 5, 20, 80 };
 
         [Header("Startscherm")]
-        [Tooltip("Hoe sterk het donkere vlak het bewegende ijsrooster afdekt (1 = effen achtergrond, zoals C.chem).")]
-        [Range(0f, 1f)] public float achtergrondDekking = 0.92f;
         [Tooltip("Beelden per seconde op het startscherm (spaart batterij).")]
         public int startschermFps = 30;
 
@@ -71,7 +69,7 @@ namespace WaterSim.UI
         Canvas canvas;
         CanvasScaler schaler;
         RectTransform veilig, kolom, startPagina, simPagina;
-        Image startAchtergrond;
+        RectTransform startAchtergrond;
         TextMeshProUGUI tTemp, tStatus, tOmgeving;
         Slider schuif;
         RectTransform uitklap;
@@ -126,8 +124,18 @@ namespace WaterSim.UI
             schaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             schaler.referenceResolution = new Vector2(390f, 844f);
 
-            startAchtergrond = Vlak(go.transform, "Achtergrond", new Color(Achtergrond.r, Achtergrond.g, Achtergrond.b, achtergrondDekking));
-            Vul(startAchtergrond.rectTransform);
+            // achtergrond in de stijl van het icoon: water (lagune + golf), ijsrooster, schuim en stoom
+            startAchtergrond = Maak("Achtergrond", go.transform);
+            Vul(startAchtergrond);
+            foreach (IcoonAchtergrond.Laag l in System.Enum.GetValues(typeof(IcoonAchtergrond.Laag)))
+            {
+                // CanvasRenderer eerst zelf toevoegen: Unity doet dat hier niet vanzelf, en zonder tekent het vlak niets
+                var go2 = Maak(l.ToString(), startAchtergrond).gameObject;
+                go2.AddComponent<CanvasRenderer>();
+                var laag = go2.AddComponent<IcoonAchtergrond>();
+                laag.laag = l;
+                Vul(laag.rectTransform);
+            }
 
             veilig = Maak("VeiligeZone", go.transform);
             kolom = Maak("Kolom", veilig);
@@ -216,7 +224,7 @@ namespace WaterSim.UI
             LE(logo.gameObject, flexW: 1f);
             var taal = Pilknop(kop.transform, Teksten.T("taal"), () => Teksten.Stel(Teksten.Huidig == Taal.NL ? Taal.EN : Taal.NL), 0f);
             LE(taal.img.gameObject, prefW: 52f);
-            var lijn = Vlak(startPagina, "Lijn", Hex("1D1D3A"));
+            var lijn = Vlak(startPagina, "Lijn", new Color(1f, 1f, 1f, 0.35f));
             LE(lijn.gameObject, prefH: 1f);
 
             // levels: 3 × 2 tegels
@@ -465,16 +473,11 @@ namespace WaterSim.UI
             if (!opnieuw || kristal == null) return;
 
             Application.targetFrameRate = p == Pagina.Start ? startschermFps : kristal.beeldenPerSeconde;
+            // op het startscherm ligt het 3D-kristal stil (de achtergrond dekt alles af): spaart batterij
+            kristal.enabled = p == Pagina.Sim;
             if (p == Pagina.Start)
             {
                 if (vliegcamera != null) vliegcamera.enabled = false;
-                kristal.oneindig = true;
-                if (vliegcamera != null && kristal.Model != null)
-                {
-                    var pos = vliegcamera.transform.position;
-                    kristal.Model.Rooster.DichtstbijzijndKanaal(pos.x, pos.y, out double kx, out double ky);
-                    vliegcamera.Zet(new Vector3((float)kx, (float)ky, pos.z), new Vector3((float)kx, (float)ky, pos.z + 1f));
-                }
             }
             else
             {
@@ -505,12 +508,7 @@ namespace WaterSim.UI
             if (Screen.safeArea != laatsteSafe || Screen.width != (int)laatsteScherm.x || Screen.height != (int)laatsteScherm.y) PasSchermAan();
             if (kristal == null || kristal.Model == null) return;
 
-            if (pagina == Pagina.Start)
-            {
-                // achter het startscherm vliegt de camera langzaam door een kanaal
-                if (vliegcamera != null) vliegcamera.transform.position += vliegcamera.transform.forward * (1.2f * Time.deltaTime);
-                return;
-            }
+            if (pagina == Pagina.Start) return;
 
             if ((statusTimer += Time.deltaTime) > 0.12f)
             {
