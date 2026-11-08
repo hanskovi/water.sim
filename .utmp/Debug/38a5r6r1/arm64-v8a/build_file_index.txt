@@ -1,0 +1,2 @@
+/Users/hanskovi/Creative Cloud/ConceptCraft/3D_interactive_projects/apps/Water.sim/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp/CMakeLists.txt
+/Users/hanskovi/Creative Cloud/ConceptCraft/3D_interactive_projects/apps/Water.sim/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp/GameActivity/CMakeLists.txt

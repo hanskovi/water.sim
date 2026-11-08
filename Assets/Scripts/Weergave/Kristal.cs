@@ -40,6 +40,10 @@ namespace WaterSim.Weergave
         public float pulsSnelheid = 2.6f;
         [Range(0f, 0.6f)] public float pulsSterkte = 0.35f;
 
+        [Header("Beeldsnelheid")]
+        [Tooltip("Op Android en iOS staat Unity standaard op 30 beelden per seconde. 60 maakt vliegen veel vloeiender.")]
+        public int beeldenPerSeconde = 60;
+
         [Header("Nevel (Å)")]
         public float nevelStart = 6f;
         public float nevelEind = 14f;
@@ -81,6 +85,9 @@ namespace WaterSim.Weergave
 
         void Awake()
         {
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = beeldenPerSeconde;
+
             Rooster = new IJsrooster(nx, ny, nz);
             IJsregels.Pas(Rooster, zaad);
             IJsregels.HAtomen(Rooster, out var dhx, out var dhy, out var dhz, out acceptor, out _);

@@ -134,6 +134,10 @@ namespace WaterSim.Editor
             bloom.intensity.Override(1.6f);
             bloom.scatter.Override(0.7f);
             bloom.tint.Override(new Color(0.6f, 0.8f, 1f));
+            // goedkoper op telefoons: gloed op een kwart van de resolutie, minder vervaagstappen
+            bloom.downscale.Override(BloomDownscaleMode.Quarter);
+            bloom.maxIterations.Override(5);
+            bloom.highQualityFiltering.Override(false);
             EditorUtility.SetDirty(bloom);
             EditorUtility.SetDirty(profiel);
             return profiel;
