@@ -58,3 +58,6 @@ crashlytics-build.properties
 
 # macOS
 .DS_Store
+
+# Tijdelijke bouwbestanden van Unity (Android-build)
+.utmp/
