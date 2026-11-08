@@ -132,6 +132,35 @@ def ijsring(d, db, cx, cy, R, schaal, hoeken):
             h_brug(db, h1, nxt, 13 * schaal, 22 * schaal, max(4, int(7 * schaal)), 3)
 
 
+BINNEN_R = 178   # alles (moleculen, atomen, bruggen) blijft binnen deze straal; de binnenste ring ligt op ~200
+
+
+def binnen_cirkel(lagen, cx, cy, straal):
+    """Schaalt de tekening rond het midden kleiner tot alles binnen de cirkel valt (zoekt de grootste passende schaal)."""
+    from PIL import ImageChops
+    buiten = Image.new("L", (W, H), 255)
+    ImageDraw.Draw(buiten).ellipse([cx - straal, cy - straal, cx + straal, cy + straal], fill=0)
+
+    def geschaald(img, s):
+        return img.transform((W, H), Image.AFFINE, (1 / s, 0, cx - cx / s, 0, 1 / s, cy - cy / s), resample=Image.BICUBIC)
+
+    def past(s):
+        for l in lagen:
+            a = geschaald(l, s).getchannel("A").point(lambda v: 255 if v > 24 else 0)
+            if ImageChops.multiply(a, buiten).getbbox():
+                return False
+        return True
+
+    if past(1.0):
+        return lagen
+    laag_s, hoog_s = 0.4, 1.0
+    for _ in range(12):
+        mid = (laag_s + hoog_s) / 2
+        if past(mid): laag_s = mid
+        else: hoog_s = mid
+    return [geschaald(l, laag_s) for l in lagen]
+
+
 def tegel(n):
     f_groot = ImageFont.truetype(FONT, 26)
     f_klein = ImageFont.truetype(FONT, 18)
@@ -193,6 +222,7 @@ def tegel(n):
                 rr = 5 - k
                 d.ellipse([x - rr, y + 26 + k * 16 - rr, x + rr, y + 26 + k * 16 + rr], fill=CYAAN + (220 - 55 * k,))
 
+    tek, bruggen = binnen_cirkel([tek, bruggen], cx, cy, BINNEN_R)
     bruggen = gloed(bruggen, 6)
     tek = gloed(tek, 5)
     beeld = Image.alpha_composite(Image.alpha_composite(basis, bruggen), tek)
