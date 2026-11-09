@@ -161,6 +161,24 @@ def binnen_cirkel(lagen, cx, cy, straal):
     return [geschaald(l, laag_s) for l in lagen]
 
 
+def golfpad(y0, amp, x0, x1, n=80):
+    return [(x0 + (x1 - x0) * i / n, y0 + amp * math.sin(i / n * 2 * math.pi * 1.2 + 0.4)) for i in range(n + 1)]
+
+
+def vloeistof(d, db, punten, schaal):
+    """Losse watermoleculen; korte H-bruggen waar een H recht naar een buur wijst."""
+    mols = [molecuul(d, x, y, schaal, h, labels=False) for (x, y, h) in punten]
+    for i, (o, hs) in enumerate(mols):
+        for hp in hs:
+            for j, (o2, _) in enumerate(mols):
+                if i == j: continue
+                vx, vy = o2[0] - hp[0], o2[1] - hp[1]
+                a = math.hypot(vx, vy)
+                rx, ry = hp[0] - o[0], hp[1] - o[1]
+                if a < 60 * schaal / 0.55 and (vx * rx + vy * ry) / (a * math.hypot(rx, ry)) > 0.8:
+                    h_brug(db, hp, o2, 13 * schaal, 22 * schaal, 4, 2)
+
+
 def tegel(n):
     f_groot = ImageFont.truetype(FONT, 26)
     f_klein = ImageFont.truetype(FONT, 18)
@@ -201,13 +219,18 @@ def tegel(n):
                     rx, ry = hp[0] - o[0], hp[1] - o[1]
                     if afst < 58 and (vx * rx + vy * ry) / (afst * math.hypot(rx, ry)) > 0.8:
                         h_brug(db, hp, o2, 13 * 0.55, 22 * 0.55, 4, 2)
-    elif n == 5:    # bekerglas met drijvend ijsblokje
-        bx, by, bw, bh = cx - 110, cy - 90, 220, 200
-        d.rectangle([bx, by + 70, bx + bw, by + bh], fill=(60, 150, 255, 110))
-        d.line([bx, by, bx, by + bh, bx + bw, by + bh, bx + bw, by], fill=WIT + (230,), width=6)
-        d.rectangle([bx + 70, by + 40, bx + 140, by + 100], fill=(225, 245, 255, 235), outline=CYAAN + (255,), width=4)
-        d.line([bx, by + 70, bx + bw, by + 70], fill=CYAAN + (255,), width=4)
-        d.text((bx + bw + 14, by + 60), "ρ", font=f_groot, fill=(255, 255, 255, 255))
+    elif n == 5:    # dichtheid: ijsblokje (honingraat van hele moleculen) drijft, een klein stukje boven het water
+        wl = cy + 5
+        db.line(golfpad(wl, 5, cx - 170, cx + 170), fill=CYAAN + (235,), width=5)
+        z = 150
+        bx, by = cx - z / 2, wl - z * 0.12
+        blok = laag()
+        ImageDraw.Draw(blok).rounded_rectangle([bx, by, bx + z, by + z * 0.82], radius=14, fill=(200, 240, 255, 55), outline=(235, 250, 255, 255), width=5)
+        tek = Image.alpha_composite(tek, blok)
+        d = ImageDraw.Draw(tek)
+        ijsring(d, db, cx, by + z * 0.41, 38, 0.36, [60 * k + 30 for k in range(6)])
+        vloeistof(d, db, [(cx - 140, wl + 40, 20), (cx + 140, wl + 45, 200), (cx - 125, wl + 95, 300), (cx + 125, wl + 100, 110),
+                          (cx - 60, wl + 140, 60), (cx + 20, wl + 150, 250), (cx + 90, wl + 145, 330)], 0.45)
     elif n == 6:    # koken: dicht water onderin met belletjes; hele moleculen komen los en stijgen op
         opp = cy + 25
         d.line([cx - 175, opp, cx + 175, opp], fill=CYAAN + (220,), width=4)

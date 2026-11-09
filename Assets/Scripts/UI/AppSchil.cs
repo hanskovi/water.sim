@@ -44,6 +44,12 @@ namespace WaterSim.UI
         static readonly Color Grijs = Hex("9FB3C2");
         static readonly Color Zacht = Hex("AAB0D8");
 
+        // startscherm: glas en ijs met complementair oranje als accent (oranje ligt tegenover de lagune op de kleurcirkel)
+        static readonly Color OranjeL = Hex("F7884D"), OranjeR = Hex("E8502E");
+        static readonly Color GlasRand = new Color(1f, 1f, 1f, 0.35f);
+        static readonly Color IJsTekst = Hex("E3F7FC");
+        static readonly Color LaguneHex = Hex("0E7C9E");
+
         struct LevelInfo
         {
             public bool speelbaar, oneindig;
@@ -73,6 +79,7 @@ namespace WaterSim.UI
         TextMeshProUGUI tTemp, tStatus, tOmgeving;
         Slider schuif;
         RectTransform uitklap;
+        Image nevel;
         Image uitklapIcoon;
         bool uitgeklapt = true;
         readonly List<(Image img, TextMeshProUGUI t, int waarde)> snel = new List<(Image, TextMeshProUGUI, int)>();
@@ -210,20 +217,56 @@ namespace WaterSim.UI
         }
 
         // ---------- startscherm ----------
+        // glazen vlak: doorzichtig wit met een dunne witte rand
+        Image Glas(Transform ouder, string naam, float radius, float dekking = 0.16f, bool metRand = true)
+        {
+            var img = Vlak(ouder, naam, new Color(1f, 1f, 1f, dekking), radius);
+            if (metRand)
+            {
+                var r = Maak("Rand", img.transform).gameObject.AddComponent<Image>();
+                r.sprite = RandSprite(); r.type = Image.Type.Sliced; r.pixelsPerUnitMultiplier = 24f / radius;
+                r.color = GlasRand; r.raycastTarget = false;
+                Vul(r.rectTransform);
+                r.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            }
+            return img;
+        }
+
+        static void Oranje(Image img, float radius)
+        {
+            img.sprite = Verloop(OranjeL, OranjeR);
+            img.type = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = 24f / radius;
+            img.color = Color.white;
+        }
+
         void BouwStart()
         {
             Kolom(startPagina, 14, 10);
+
+            // nevelwolk achter alle knoppen (doet niet mee in de opmaak, ademt langzaam in Update)
+            nevel = Maak("Nevel", startPagina).gameObject.AddComponent<Image>();
+            nevel.sprite = NevelSprite(); nevel.type = Image.Type.Sliced; nevel.pixelsPerUnitMultiplier = 0.55f;
+            nevel.color = new Color(1f, 1f, 1f, 0.30f);
+            nevel.raycastTarget = false;
+            nevel.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            var nr = nevel.rectTransform;
+            nr.anchorMin = new Vector2(0f, 0.22f); nr.anchorMax = new Vector2(1f, 0.92f);
+            nr.offsetMin = new Vector2(-24f, 0f); nr.offsetMax = new Vector2(24f, 0f);
 
             // kop: H₂O · Water.sim · taal
             var kop = Rij(startPagina, "Kop", 44f, 10f);
             var merk = Vlak(kop.transform, "H2O", Color.white, 8f);
             LE(merk.gameObject, prefW: 58f);
-            var merkTekst = Tekst(merk.transform, "Tekst", "H<sub>2</sub>O", 19f, Achtergrond, TextAlignmentOptions.Center, true);
+            var merkTekst = Tekst(merk.transform, "Tekst", "H<sub>2</sub>O", 19f, Lin(Hex("0B3570")), TextAlignmentOptions.Center, true);
             Vul(merkTekst.rectTransform);
             var logo = Tekst(kop.transform, "Logo", "<b>Water.</b><size=72%>sim</size>", 27f, Color.white, TextAlignmentOptions.Left);
             LE(logo.gameObject, flexW: 1f);
-            var taal = Pilknop(kop.transform, Teksten.T("taal"), () => Teksten.Stel(Teksten.Huidig == Taal.NL ? Taal.EN : Taal.NL), 0f);
-            LE(taal.img.gameObject, prefW: 52f);
+            var taal = Glas(kop.transform, "Taal", 8f);
+            LE(taal.gameObject, prefW: 52f);
+            var tt = Tekst(taal.transform, "Tekst", Teksten.T("taal"), 14f, Color.white, TextAlignmentOptions.Center);
+            Vul(tt.rectTransform);
+            Knop(taal, () => Teksten.Stel(Teksten.Huidig == Taal.NL ? Taal.EN : Taal.NL));
             var lijn = Vlak(startPagina, "Lijn", new Color(1f, 1f, 1f, 0.35f));
             LE(lijn.gameObject, prefH: 1f);
 
@@ -238,8 +281,8 @@ namespace WaterSim.UI
             LE(raster.gameObject, prefH: 84f * 2 + 9f);
             for (int i = 0; i < Levels.Length; i++) LevelTegel(raster, i);
 
-            // leagues
-            var strook = Vlak(startPagina, "Leagues", Strook, 9f);
+            // leagues: glazen strook, de gekozen league oranje
+            var strook = Glas(startPagina, "Leagues", 9f, 0.10f);
             LE(strook.gameObject, prefH: 42f);
             var lr = strook.gameObject.AddComponent<HorizontalLayoutGroup>();
             lr.padding = new RectOffset(4, 4, 4, 4); lr.spacing = 4;
@@ -247,51 +290,51 @@ namespace WaterSim.UI
             for (int i = 0; i < 3; i++)
             {
                 int l = i;
-                var p = Pilknop(strook.transform, Teksten.T("league." + i), () => { league = l; PlayerPrefs.SetInt("watersim.league", l); Bouw(); });
-                Actief(p.img, p.t, i == league);
+                var pil = Vlak(strook.transform, "League" + i, new Color(1f, 1f, 1f, 0.14f), 7f);
+                if (i == league) Oranje(pil, 7f);
+                var t = Tekst(pil.transform, "Tekst", Teksten.T("league." + i), 13.5f, Color.white, TextAlignmentOptions.Center, i == league);
+                Vul(t.rectTransform, 4, 0, 4, 0);
+                Knop(pil, () => { league = l; PlayerPrefs.SetInt("watersim.league", l); Bouw(); });
             }
 
             // uitleg van het gekozen level
-            var kaart = Vlak(startPagina, "Uitleg", Kaart, 12f);
+            var kaart = Glas(startPagina, "Uitleg", 12f);
             var kv = Kolom((RectTransform)kaart.transform, 14, 6);
             kv.childAlignment = TextAnchor.UpperLeft;
             var titel = Tekst(kaart.transform, "Titel", $"{level + 1} · {Teksten.T($"level.{level + 1}.titel")}", 18f, Color.white, TextAlignmentOptions.Left, true);
             LE(titel.gameObject, prefH: 24f);
-            Tekst(kaart.transform, "Uitleg", Teksten.T($"level.{level + 1}.uitleg"), 14f, Zacht, TextAlignmentOptions.TopLeft, false, true);
+            Tekst(kaart.transform, "Uitleg", Teksten.T($"level.{level + 1}.uitleg"), 14f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
 
-            // startknop
+            // startknop: wit, met lagunekleurige tekst
             bool speelbaar = Levels[level].speelbaar;
-            var start = Vlak(startPagina, "Start", speelbaar ? Check : new Color(1, 1, 1, 0.12f), 12f);
+            var start = speelbaar ? Vlak(startPagina, "Start", Color.white, 12f) : Glas(startPagina, "Start", 12f, 0.12f);
             LE(start.gameObject, prefH: 52f);
             var sr = start.gameObject.AddComponent<HorizontalLayoutGroup>();
             sr.childAlignment = TextAnchor.MiddleCenter; sr.spacing = 8;
             sr.childControlWidth = sr.childControlHeight = false;
             sr.childForceExpandWidth = sr.childForceExpandHeight = false;
-            var st = Tekst(start.transform, "Tekst", speelbaar ? Teksten.T("start") : Teksten.T("binnenkort"), 19f, speelbaar ? CheckTekst : Grijs, TextAlignmentOptions.Center, true);
+            var lagune = Lin(LaguneHex);
+            var st = Tekst(start.transform, "Tekst", speelbaar ? Teksten.T("start") : Teksten.T("binnenkort"), 19f, speelbaar ? lagune : IJsTekst, TextAlignmentOptions.Center, true);
             st.rectTransform.sizeDelta = new Vector2(st.preferredWidth, 30f);
             if (speelbaar)
             {
-                var pijl = Icoon(start.transform, "Pijl", PijlRechts(), CheckTekst);
+                var pijl = Icoon(start.transform, "Pijl", PijlRechts(), lagune);
                 pijl.rectTransform.sizeDelta = new Vector2(18f, 18f);
                 Knop(start, () => ToonPagina(Pagina.Sim));
             }
 
+            // voortgang direct onder de startknop (dun)
+            Voortgang(startPagina);
+
             var vrij = Maak("Ruimte", startPagina);
             LE(vrij.gameObject, flexH: 1f);
-
-            Voortgang(startPagina);
         }
 
         void LevelTegel(Transform ouder, int i)
         {
             bool gekozen = i == level, speelbaar = Levels[i].speelbaar;
-            var bg = Vlak(ouder, "Level" + (i + 1), Tegel, 10f);
-            if (gekozen)
-            {
-                bg.sprite = Verloop(Warm1, Warm2);
-                bg.color = Color.white;
-                bg.pixelsPerUnitMultiplier = 24f / 10f;
-            }
+            var bg = Glas(ouder, "Level" + (i + 1), 10f, 0.16f, !gekozen);
+            if (gekozen) Oranje(bg, 10f);
             var tex = Resources.Load<Texture2D>($"interface/level{i + 1}_neon");
             if (tex != null)
             {
@@ -302,13 +345,13 @@ namespace WaterSim.UI
                 var fitter = art.gameObject.AddComponent<AspectRatioFitter>();
                 fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
                 fitter.aspectRatio = 4f / 3f;
-                art.color = new Color(1f, 1f, 1f, speelbaar ? (gekozen ? 0.95f : 0.85f) : 0.35f);
+                art.color = new Color(1f, 1f, 1f, speelbaar ? 1f : 0.45f);
                 Vul(art.rectTransform, 2f, 2f, 2f, 2f);
             }
-            var nr = Tekst(bg.transform, "Nummer", (i + 1).ToString(), 16f, gekozen ? Hex("2A1020") : Color.white, TextAlignmentOptions.TopLeft, true);
+            var nr = Tekst(bg.transform, "Nummer", (i + 1).ToString(), 16f, Color.white, TextAlignmentOptions.TopLeft, true);
             Vul(nr.rectTransform, 8f, 4f, 4f, 5f);
             var naam = Tekst(bg.transform, "Naam", speelbaar ? Teksten.T($"level.{i + 1}.kort") : Teksten.T("binnenkort"), 11f,
-                             gekozen ? Hex("2A1020") : (speelbaar ? Color.white : Grijs), TextAlignmentOptions.BottomLeft);
+                             speelbaar || gekozen ? Color.white : IJsTekst, TextAlignmentOptions.BottomLeft);
             Vul(naam.rectTransform, 8f, 5f, 4f, 4f);
             int idx = i;
             Knop(bg, () => { level = idx; PlayerPrefs.SetInt("watersim.level", idx); Bouw(); });
@@ -317,26 +360,30 @@ namespace WaterSim.UI
         void Voortgang(Transform ouder)
         {
             int sterren = PlayerPrefs.GetInt("watersim.sterren", 0);
-            var rij = Rij(ouder, "Voortgang", 20f, 8f);
-            var balk = Vlak(rij.transform, "Balk", Hex("1C2050"), 10f);
-            LE(balk.gameObject, flexW: 1f);
-            var vul = Vlak(balk.transform, "Vul", Color.white, 10f);
-            vul.sprite = Verloop(Warm1, Warm2); vul.pixelsPerUnitMultiplier = 2.4f;
+            var rij = Rij(ouder, "Voortgang", 16f, 8f);
+            var houder = Maak("Balkhouder", rij.transform);
+            LE(houder.gameObject, flexW: 1f);
+            var balk = Glas(houder, "Balk", 6f, 0.18f);
+            balk.rectTransform.anchorMin = new Vector2(0f, 0.5f); balk.rectTransform.anchorMax = new Vector2(1f, 0.5f);
+            balk.rectTransform.sizeDelta = new Vector2(0f, 12f);
+            var vul = Vlak(balk.transform, "Vul", Color.white, 6f);
+            Oranje(vul, 6f);
             vul.raycastTarget = false;
             vul.rectTransform.anchorMin = Vector2.zero;
-            vul.rectTransform.anchorMax = new Vector2(Mathf.Clamp(sterren / 30f, 0.08f, 1f), 1f);
+            vul.rectTransform.anchorMax = new Vector2(Mathf.Clamp(sterren / 30f, 0.05f, 1f), 1f);
             vul.rectTransform.offsetMin = vul.rectTransform.offsetMax = Vector2.zero;
-            var bt = Tekst(balk.transform, "Tekst", $"{Mathf.Min(sterren, 30)}/30", 10.5f, Color.white, TextAlignmentOptions.Center, true);
+            vul.transform.SetSiblingIndex(0);
+            var bt = Tekst(balk.transform, "Tekst", $"{Mathf.Min(sterren, 30)}/30", 9.5f, Color.white, TextAlignmentOptions.Center, true);
             Vul(bt.rectTransform);
 
-            var pil = Vlak(rij.transform, "Sterren", Color.white, 10f);
-            pil.sprite = Verloop(Warm1, Warm2); pil.pixelsPerUnitMultiplier = 2.4f;
-            LE(pil.gameObject, prefW: 64f, flexW: 0f);
+            var pil = Vlak(rij.transform, "Sterren", Color.white, 8f);
+            Oranje(pil, 8f);
+            LE(pil.gameObject, prefW: 60f, flexW: 0f);
             var h = pil.gameObject.AddComponent<HorizontalLayoutGroup>();
             h.childAlignment = TextAnchor.MiddleCenter; h.spacing = 4; h.childControlWidth = h.childControlHeight = false;
             h.childForceExpandWidth = h.childForceExpandHeight = false;
-            Icoon(pil.transform, "Ster", Ster(), Hex("2A1020")).rectTransform.sizeDelta = new Vector2(12f, 12f);
-            var t = Tekst(pil.transform, "Aantal", sterren.ToString(), 11f, Hex("2A1020"), TextAlignmentOptions.Center, true);
+            Icoon(pil.transform, "Ster", Ster(), Color.white).rectTransform.sizeDelta = new Vector2(11f, 11f);
+            var t = Tekst(pil.transform, "Aantal", sterren.ToString(), 11f, Color.white, TextAlignmentOptions.Center, true);
             t.rectTransform.sizeDelta = new Vector2(t.preferredWidth + 2f, 16f);
         }
 
@@ -508,7 +555,12 @@ namespace WaterSim.UI
             if (Screen.safeArea != laatsteSafe || Screen.width != (int)laatsteScherm.x || Screen.height != (int)laatsteScherm.y) PasSchermAan();
             if (kristal == null || kristal.Model == null) return;
 
-            if (pagina == Pagina.Start) return;
+            if (pagina == Pagina.Start)
+            {
+                // de nevel ademt heel langzaam (mist die zacht beweegt)
+                if (nevel != null) nevel.color = new Color(1f, 1f, 1f, 0.27f + 0.05f * Mathf.Sin(Time.unscaledTime * 0.35f));
+                return;
+            }
 
             if ((statusTimer += Time.deltaTime) > 0.12f)
             {

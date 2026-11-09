@@ -111,7 +111,7 @@ namespace WaterSim.UI
 
         // ---------- zelf getekende plaatjes ----------
         const int SpriteMaat = 64, SpriteRadius = 24;
-        static Sprite rond, cirkel, ster, pijlLinks, pijlRechts, pijlOmlaag, pijlOmhoog, vink;
+        static Sprite rond, rand, nevel, cirkel, ster, pijlLinks, pijlRechts, pijlOmlaag, pijlOmhoog, vink;
         static readonly Dictionary<string, Sprite> verlopen = new Dictionary<string, Sprite>();
 
         /// <summary>Wit afgerond vierkant (9-slice); kleur via Image.color, straal via pixelsPerUnitMultiplier.</summary>
@@ -155,6 +155,55 @@ namespace WaterSim.UI
             s = Sprite.Create(Textuur(w, h, px), new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
             verlopen[sleutel] = s;
             return s;
+        }
+
+        /// <summary>Alleen de rand van een afgerond vlak (9-slice), voor de dunne witte rand van glas.</summary>
+        public static Sprite RandSprite()
+        {
+            if (rand != null) return rand;
+            const int n = SpriteMaat, r = SpriteRadius;
+            const float dikte = 2.2f;
+            var px = new Color32[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float cx = x < r ? r : x >= n - r ? n - r : x + 0.5f;
+                    float cy = y < r ? r : y >= n - r ? n - r : y + 0.5f;
+                    float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+                    float afst = Mathf.Sqrt(dx * dx + dy * dy);             // 0 in het midden, r op de rand
+                    float buiten = Mathf.Clamp01(r - afst + 0.5f);
+                    float binnen = Mathf.Clamp01(afst - (r - dikte) + 0.5f);
+                    px[y * n + x] = new Color32(255, 255, 255, (byte)(buiten * binnen * 255f));
+                }
+            rand = Sprite.Create(Textuur(n, n, px), new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
+            return rand;
+        }
+
+        /// <summary>Zachte witte wolk (9-slice met brede, vervagende randen) voor nevel achter de knoppen.</summary>
+        public static Sprite NevelSprite()
+        {
+            if (nevel != null) return nevel;
+            const int n = 128, zacht = 52;
+            var px = new Color32[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float dx = Mathf.Max(0f, Mathf.Max(zacht - (x + 0.5f), (x + 0.5f) - (n - zacht)));
+                    float dy = Mathf.Max(0f, Mathf.Max(zacht - (y + 0.5f), (y + 0.5f) - (n - zacht)));
+                    float t = Mathf.Clamp01(Mathf.Sqrt(dx * dx + dy * dy) / zacht);
+                    float a = 1f - t * t * (3f - 2f * t);
+                    px[y * n + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+                }
+            nevel = Sprite.Create(Textuur(n, n, px), new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(zacht, zacht, zacht, zacht));
+            return nevel;
+        }
+
+        /// <summary>Kleur zoals bedoeld (hexcode): in een lineair project rekent Unity UI-kleuren anders om.</summary>
+        public static Color Lin(Color c)
+        {
+            if (QualitySettings.activeColorSpace != ColorSpace.Linear) return c;
+            var l = c.linear;
+            return new Color(l.r, l.g, l.b, c.a);
         }
 
         public static Sprite Cirkel() => cirkel != null ? cirkel : cirkel = Veelhoek(Rondje(40));
