@@ -579,19 +579,13 @@ namespace WaterSim.UI
             nul.rectTransform.sizeDelta = new Vector2(2f, 18f);
             nul.transform.SetSiblingIndex(1);
 
-            // streepje bij 4 °C (grootste dichtheid van water), met "ρ max" eronder
+            // streepje bij 4 °C (grootste dichtheid van water); "max" staat in de statusregel (onder de duim zou het wegvallen)
             float f4 = Mathf.InverseLerp(s.minValue, s.maxValue, (float)WaterSim.Sim.Constanten.TemperatuurMaxDichtheid);
             var vier = Vlak(go.transform, "Vier", new Color(1f, 1f, 1f, 0.75f));
             vier.raycastTarget = false;
             vier.rectTransform.anchorMin = vier.rectTransform.anchorMax = new Vector2(f4, 0.5f);
             vier.rectTransform.sizeDelta = new Vector2(1.5f, 12f);
             vier.transform.SetSiblingIndex(2);
-            var rhoMax = Tekst(go.transform, "RhoMax", Teksten.T("rho.max"), 8.5f, IJsTekst, TextAlignmentOptions.Center);
-            rhoMax.raycastTarget = false;
-            rhoMax.rectTransform.anchorMin = rhoMax.rectTransform.anchorMax = new Vector2(f4, 0.5f);
-            rhoMax.rectTransform.sizeDelta = new Vector2(40f, 10f);
-            rhoMax.rectTransform.anchoredPosition = new Vector2(0f, -12f);
-            rhoMax.transform.SetSiblingIndex(3);
 
             var duim = s.handleRect.GetComponent<Image>();
             duim.sprite = Cirkel();
@@ -706,7 +700,8 @@ namespace WaterSim.UI
                             : kristal.temperatuurOmgeving > 0 ? Teksten.T("fase.smelten") : kristal.temperatuurOmgeving < 0 ? Teksten.T("fase.bevriezen") : Teksten.T("fase.mengsel");
                 tTemp.text = Teksten.Graden(T, 1);
                 tStatus.text = $"<b><color=#FFFFFF>{fase}</color></b> · {Mathf.RoundToInt((float)m.Fase.Gesmolten * 100)}% {Teksten.T("gesmolten")}\n" +
-                               $"{Teksten.Getal(m.BruggenPerMolecuul, "0.0")} {Teksten.T("hbruggen")} · ρ {Teksten.Getal(m.Dichtheid, m.Fase.Gesmolten >= 1 ? "0.00000" : "0.000")}";   // water: 5 decimalen, anders zie je het maximum bij 4 °C niet
+                               $"{Teksten.Getal(m.BruggenPerMolecuul, "0.0")} {Teksten.T("hbruggen")} · ρ {Teksten.Getal(m.Dichtheid, m.Fase.Gesmolten >= 1 ? "0.00000" : "0.000")}" +   // water: 5 decimalen, anders zie je het maximum bij 4 °C niet
+                               (m.Fase.Gesmolten >= 1 && Math.Abs(T - WaterSim.Sim.Constanten.TemperatuurMaxDichtheid) < 0.5 ? $" <b><color=#F7884D>· {Teksten.T("rho.max")}</color></b>" : "");
             }
             tOmgeving.text = $"{Teksten.T("omgeving")} <b>{Teksten.Graden(kristal.temperatuurOmgeving, 0, true)}</b>";
             schuif.SetValueWithoutNotify(kristal.temperatuurOmgeving);
