@@ -42,6 +42,18 @@ namespace WaterSim.Weergave
         [Tooltip("Kalotten: van-der-Waalsstralen (Bondi: O 1,52 Å, H 1,20 Å) maal deze factor; verhouding H : O blijft juist.")]
         [Range(0.5f, 1f)] public float kalottenSchaal = 0.85f;
 
+        [Header("Vorm van de H-bruggen (bol-staaf)")]
+        [Tooltip("Stippen: rij bolletjes met een lichte kern. Streepjes: neon-pilletjes.")]
+        public BrugVorm brugVorm = BrugVorm.Stippen;
+        [Range(1, 16)] public int brugDelen = 7;
+        [Tooltip("Streepjes: deel van elk stuk dat gevuld is (de rest is gat).")]
+        [Range(0.15f, 0.95f)] public float brugVulling = 0.4f;
+        [Tooltip("Straal van een stip of streepje in Å.")]
+        [Range(0.01f, 0.12f)] public float brugStraal = 0.042f;
+        [Tooltip("Lichte kern in elke stip: straal t.o.v. de stip, en kleur (HDR: boven 1 gloeit hij mee).")]
+        [Range(0f, 0.9f)] public float kernSchaal = 0.45f;
+        [ColorUsage(true, true)] public Color kernKleur = new Color(0.75f, 0.92f, 1.3f, 0.85f);
+
         [Header("Pulseren van de H-bruggen")]
         public bool pulseren = true;
         public float pulsSnelheid = 2.6f;
@@ -73,7 +85,8 @@ namespace WaterSim.Weergave
         /// <summary>Tijd voor de simulatie dit beeld, in ms.</summary>
         public float SimulatieMs { get; private set; }
 
-        const int BrugStreepjes = 4;
+        public enum BrugVorm { Stippen, Streepjes }
+        const int MaxBrugDelen = 16;
         const int PulsGroepen = 6;
         const float AfstandOH = (float)Constanten.AfstandOH;
 
@@ -81,8 +94,10 @@ namespace WaterSim.Weergave
         Matrix4x4[] mO, mK, mH, mS;
         int nO, nK, nH, nS;
         readonly List<Matrix4x4>[] mB = new List<Matrix4x4>[PulsGroepen];
+        readonly List<Matrix4x4>[] mBK = new List<Matrix4x4>[PulsGroepen];      // de lichte kernen
         readonly List<Matrix4x4> mRand = new List<Matrix4x4>(), mNiveau = new List<Matrix4x4>();
-        Material[] brugGroep;
+        Material[] brugGroep, kernGroep;
+        Mesh stip;
         Color brugKleur;
         Camera cam;
         readonly System.Diagnostics.Stopwatch klok = new System.Diagnostics.Stopwatch();
@@ -99,15 +114,25 @@ namespace WaterSim.Weergave
 
             mO = new Matrix4x4[n]; mK = new Matrix4x4[n];
             mH = new Matrix4x4[2 * n]; mS = new Matrix4x4[2 * n];
-            for (int g = 0; g < PulsGroepen; g++) mB[g] = new List<Matrix4x4>(2 * n * BrugStreepjes / PulsGroepen + 64);
+            for (int g = 0; g < PulsGroepen; g++)
+            {
+                mB[g] = new List<Matrix4x4>(2 * n * 8 / PulsGroepen + 64);
+                mBK[g] = new List<Matrix4x4>(2 * n * 8 / PulsGroepen + 64);
+            }
             if (brug != null)
             {
                 brugKleur = brug.GetColor("_BaseColor");
                 brugGroep = new Material[PulsGroepen];
-                for (int g = 0; g < PulsGroepen; g++) brugGroep[g] = new Material(brug) { name = brug.name + " " + g };
+                kernGroep = new Material[PulsGroepen];
+                for (int g = 0; g < PulsGroepen; g++)
+                {
+                    brugGroep[g] = new Material(brug) { name = brug.name + " " + g };
+                    kernGroep[g] = new Material(brug) { name = brug.name + " kern " + g };
+                }
             }
             cam = Camera.main;
             bolLaag = Icosfeer(2);
+            stip = Icosfeer(1);           // 80 driehoekjes: rond genoeg voor zo'n klein bolletje
             vierkant = new Mesh { name = "Bolvierkant" };
             vierkant.SetVertices(new List<Vector3> { new Vector3(-1, -1, 0), new Vector3(1, -1, 0), new Vector3(1, 1, 0), new Vector3(-1, 1, 0) });
             vierkant.SetTriangles(new[] { 0, 2, 1, 0, 3, 2 }, 0);
@@ -162,8 +187,8 @@ namespace WaterSim.Weergave
 
         void OnDestroy()
         {
-            if (brugGroep == null) return;
-            foreach (var m in brugGroep) if (m != null) Destroy(m);
+            if (brugGroep != null) foreach (var m in brugGroep) if (m != null) Destroy(m);
+            if (kernGroep != null) foreach (var m in kernGroep) if (m != null) Destroy(m);
         }
 
         void Update()
@@ -215,7 +240,7 @@ namespace WaterSim.Weergave
             float dichtbij = kalotten && oneindig ? doorkijkStraal : 0f, dichtbij2 = dichtbij * dichtbij;
             var X = Model.X; var Y = Model.Y; var Z = Model.Z; var H = Model.H; var acc = Model.Acceptor;
             nO = nK = nH = nS = 0;
-            for (int g = 0; g < PulsGroepen; g++) mB[g].Clear();
+            for (int g = 0; g < PulsGroepen; g++) { mB[g].Clear(); mBK[g].Clear(); }
             int zichtbaar = 0, n = Model.N;
             for (int i = 0; i < n; i++)
             {
@@ -244,7 +269,8 @@ namespace WaterSim.Weergave
                     float ax = X[j] - X[i], ay = Y[j] - Y[i], az = Z[j] - Z[i];
                     if (oneindig) { ax = Watermodel.Kortst(ax, lx); ay = Watermodel.Kortst(ay, ly); az = Watermodel.Kortst(az, lz); }
                     int brugNr = 2 * i + k;
-                    Streepjes(hp, o + new Vector3(ax, ay, az), mB[(int)((uint)(brugNr * 2654435761u) >> 16) % PulsGroepen]);
+                    int groep = (int)((uint)(brugNr * 2654435761u) >> 16) % PulsGroepen;
+                    Brug(hp, o + new Vector3(ax, ay, az), mB[groep], mBK[groep]);
                 }
             }
             ZichtbareMoleculen = zichtbaar;
@@ -280,7 +306,10 @@ namespace WaterSim.Weergave
                 {
                     float f = pulseren ? 1f + pulsSterkte * Mathf.Sin(t * pulsSnelheid + g * (2f * Mathf.PI / PulsGroepen)) : 1f;
                     brugGroep[g].SetColor("_BaseColor", new Color(brugKleur.r * f, brugKleur.g * f, brugKleur.b * f, brugKleur.a));
-                    Teken(capsule, brugGroep[g], mB[g]);
+                    kernGroep[g].SetColor("_BaseColor", new Color(kernKleur.r * f, kernKleur.g * f, kernKleur.b * f, kernKleur.a));
+                    bool stippen = brugVorm == BrugVorm.Stippen;
+                    Teken(stippen ? stip : capsule, brugGroep[g], mB[g]);
+                    Teken(stippen ? stip : capsule, kernGroep[g], mBK[g]);   // na de buitenkant: de kern ligt erover
                 }
             RekentijdMs = (float)klok.Elapsed.TotalMilliseconds;
         }
@@ -288,18 +317,30 @@ namespace WaterSim.Weergave
         /// <summary>Waar de camera in een los blok goed staat om het hele blok te zien.</summary>
         public Vector3 BlokKijkpunt => new Vector3(Model.Lx * 0.5f + 30f, 16f, Model.Lz * 0.5f + 34f);
 
-        // gestippelde H-brug van het H-atoom naar de acceptor: 4 neon-pilletjes
-        static void Streepjes(Vector3 h, Vector3 a, List<Matrix4x4> lijst)
+        // gestippelde H-brug van het H-atoom naar de acceptor: stippen of neon-pilletjes, elk met een lichte kern
+        void Brug(Vector3 h, Vector3 a, List<Matrix4x4> lijst, List<Matrix4x4> kernen)
         {
             var v = a - h;
             float L = v.magnitude;
             if (L < 0.8f) return;
             v /= L;
-            float s0 = 0.24f, s1 = L - 0.40f, stuk = (s1 - s0) / BrugStreepjes, lengte = stuk * 0.55f;
-            for (int q = 0; q < BrugStreepjes; q++)
+            int delen = Mathf.Clamp(brugDelen, 1, MaxBrugDelen);
+            float s0 = 0.24f, s1 = L - 0.40f, stuk = (s1 - s0) / delen;
+            for (int q = 0; q < delen; q++)
             {
-                float a0 = s0 + q * stuk + (stuk - lengte) / 2f;
-                lijst.Add(Staaf(h + v * a0, h + v * (a0 + lengte), 0.06f));
+                float m = s0 + (q + 0.5f) * stuk;
+                if (brugVorm == BrugVorm.Stippen)
+                {
+                    var p = h + v * m;
+                    lijst.Add(Bol(p, brugStraal));
+                    if (kernSchaal > 0f) kernen.Add(Bol(p, brugStraal * kernSchaal));
+                }
+                else
+                {
+                    float half = stuk * brugVulling * 0.5f;
+                    lijst.Add(Staaf(h + v * (m - half), h + v * (m + half), brugStraal));
+                    if (kernSchaal > 0f) kernen.Add(Staaf(h + v * (m - half), h + v * (m + half), brugStraal * kernSchaal));
+                }
             }
         }
 

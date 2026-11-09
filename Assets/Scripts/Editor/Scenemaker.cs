@@ -45,7 +45,7 @@ namespace WaterSim.Editor
             else Debug.LogWarning("Water.sim: shader WaterSim/AtoomGlad niet gevonden; gewone bollen worden gebruikt.");
             var staaf = Materiaal("Binding", lit, new Color(0.70f, 0.74f, 0.77f), 0.30f);
             // HDR-blauw (> 1) zodat alleen de H-bruggen door de bloom gaan gloeien
-            var brug = Materiaal("Waterstofbrug", unlit, new Color(0.30f, 0.72f, 2.6f, 0.85f), 0f);
+            var brug = Materiaal("Waterstofbrug", unlit, new Color(0.28f, 0.66f, 2.4f, 0.92f), 0f);
             Doorzichtig(brug);
             var rand = Materiaal("Ijsvolume", unlit, new Color(0.62f, 0.70f, 0.76f, 0.55f), 0f);
             Doorzichtig(rand);
