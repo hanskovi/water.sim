@@ -73,5 +73,30 @@ namespace WaterSim.Tests
             for (int i = 0; i < 2000; i++) f.Stap(0.05, 150);
             Assert.That(f.Temperatuur, Is.LessThanOrEqualTo(Fasemodel.MaxTemperatuur));
         }
-    }
+    
+        [Test]
+        public void ResterendeTijdKloptMetDeWarmtestroom()
+        {
+            // net begonnen met smelten bij 20 °C: 334 J/g / (1,67 · 20) = 10 s
+            var f = new Fasemodel(0) { Enthalpie = 1e-9 };
+            Assert.That(f.ResterendeTijd(20), Is.EqualTo(334 / (1.67 * 20)).Within(1e-6));
+            // halverwege stollen bij −10 °C: 167 J/g / (1,67 · 10) = 10 s
+            f.Enthalpie = 167;
+            Assert.That(f.ResterendeTijd(-10), Is.EqualTo(10).Within(1e-6));
+            // omgeving 0 °C: evenwicht, er gebeurt netto niets
+            Assert.That(double.IsPositiveInfinity(f.ResterendeTijd(0)), Is.True);
+            // buiten het plateau geen tijd
+            Assert.That(double.IsPositiveInfinity(new Fasemodel(10).ResterendeTijd(20)), Is.True);
+        }
+
+        [Test]
+        public void ResterendeTijdKomtUitMetDeSimulatie()
+        {
+            var f = new Fasemodel(0) { Enthalpie = 50 };
+            double verwacht = f.ResterendeTijd(20);
+            double t = 0;
+            while (f.IsAanHetSmelten && t < 100) { f.Stap(0.01, 20); t += 0.01; }
+            Assert.That(t, Is.EqualTo(verwacht).Within(0.05));
+        }
+}
 }

@@ -49,6 +49,21 @@ namespace WaterSim.Sim
             return (h - Constanten.Smeltwarmte) / Constanten.SoortelijkeWarmteWater;
         }
 
+        /// <summary>
+        /// Geschatte tijd (s) tot het smelten of stollen klaar is, bij deze omgevingstemperatuur.
+        /// Op het plateau is T = 0 °C, dus de warmtestroom is constant: k · T_omgeving.
+        /// Buiten het plateau, of als er netto niets gebeurt (omgeving 0 °C): oneindig.
+        /// </summary>
+        public double ResterendeTijd(double tOmgeving)
+        {
+            if (!IsAanHetSmelten) return double.PositiveInfinity;
+            tOmgeving = Math.Max(MinTemperatuur, Math.Min(MaxTemperatuur, tOmgeving));
+            double stroom = Overdracht * tOmgeving;                    // J/(g·s); > 0 smelten, < 0 stollen
+            if (stroom > 0) return (Constanten.Smeltwarmte - Enthalpie) / stroom;
+            if (stroom < 0) return Enthalpie / -stroom;
+            return double.PositiveInfinity;
+        }
+
         /// <summary>Laat warmte stromen gedurende <paramref name="dt"/> seconden (in kleine stapjes, dus stabiel).</summary>
         public void Stap(double dt, double tOmgeving)
         {

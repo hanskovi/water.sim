@@ -76,7 +76,13 @@ namespace WaterSim.UI
         CanvasScaler schaler;
         RectTransform veilig, kolom, startPagina, simPagina;
         RectTransform startAchtergrond;
-        TextMeshProUGUI tTemp, tStatus, tOmgeving;
+        TextMeshProUGUI tTemp, tOmgeving;
+        // statusblok: ring om de temperatuur, plateaulabel, opwarmkromme, regel, en H-bruggen + ρ
+        Voortgangsring ring;
+        Opwarmkromme kromme;
+        TextMeshProUGUI tRingSub, tLabel, tFase, tRegel, tBruggen, tRho, tMax;
+        Image labelPil, maxPil;
+        static readonly Color AccentWarm = Hex("F28A55"), AccentKoud = Hex("5BC2FF"), AccentRust = Hex("E8E3D8"), PilTekst = Hex("0B2230"), KrommeTekst = Hex("B9DCEA");
         Slider schuif;
         RectTransform uitklap;
         Image nevel;
@@ -504,17 +510,67 @@ namespace WaterSim.UI
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
 
-            // regel 1: temperatuur van het water + toestand + uitklappen
-            var r1 = Rij(paneel.transform, "Toestand", 46f, 10f);
-            tTemp = Tekst(r1.transform, "Temperatuur", "", 24f, Color.white, TextAlignmentOptions.Left, true);
-            LE(tTemp.gameObject, prefW: 118f);
-            tStatus = Tekst(r1.transform, "Status", "", 12.5f, IJsTekst, TextAlignmentOptions.Left, false, true);
-            LE(tStatus.gameObject, flexW: 1f);
-            var uk = Vlak(r1.transform, "Uitklappen", KnopGlas, 8f);
-            LE(uk.gameObject, prefW: 40f);
+            // regel 1: ring met de temperatuur · plateaulabel + opwarmkromme + regel · uitklappen
+            var r1 = Rij(paneel.transform, "Toestand", 96f, 12f);
+            var ringRt = Maak("Ring", r1.transform);
+            LE(ringRt.gameObject, prefW: 96f);
+            ringRt.gameObject.AddComponent<CanvasRenderer>();
+            ring = ringRt.gameObject.AddComponent<Voortgangsring>();
+            ring.raycastTarget = false; ring.dikte = 7f; ring.achter = new Color(1f, 1f, 1f, 0.16f);
+            tTemp = Tekst(ringRt, "Temperatuur", "", 20f, Color.white, TextAlignmentOptions.Center, true);
+            Vul(tTemp.rectTransform, 0, 8, 0, 0);
+            tRingSub = Tekst(ringRt, "Onder", "", 11.5f, Lin(KrommeTekst), TextAlignmentOptions.Center);
+            Vul(tRingSub.rectTransform, 0, 0, 0, 0); tRingSub.rectTransform.anchoredPosition = new Vector2(0f, -17f);
+
+            var rechts = Maak("Toestand", r1.transform);
+            LE(rechts.gameObject, flexW: 1f);
+            labelPil = Vlak(rechts, "Plateau", Color.white, 6f);
+            labelPil.raycastTarget = false;
+            Hoek(labelPil.rectTransform, new Vector2(0f, 1f), Vector2.zero, new Vector2(90f, 19f));
+            tLabel = Tekst(labelPil.transform, "Tekst", "", 11.5f, Lin(PilTekst), TextAlignmentOptions.Center, true);
+            Vul(tLabel.rectTransform);
+            tFase = Tekst(rechts, "Fase", "", 15f, Color.white, TextAlignmentOptions.TopLeft, true);
+            Hoek(tFase.rectTransform, new Vector2(0f, 1f), Vector2.zero, new Vector2(160f, 20f));
+            var kr = Maak("Kromme", rechts);
+            kr.anchorMin = new Vector2(0f, 0f); kr.anchorMax = new Vector2(1f, 1f);
+            kr.offsetMin = new Vector2(0f, 17f); kr.offsetMax = new Vector2(0f, -22f);
+            kr.gameObject.AddComponent<CanvasRenderer>();
+            kromme = kr.gameObject.AddComponent<Opwarmkromme>();
+            kromme.raycastTarget = false;
+            TextMeshProUGUI KLabel(string naam)
+            {
+                var t = Tekst(kr, naam, "", 9f, Lin(KrommeTekst), TextAlignmentOptions.Bottom);
+                t.rectTransform.sizeDelta = new Vector2(70f, 11f);
+                return t;
+            }
+            kromme.lNul = KLabel("Nul"); kromme.lIjs = KLabel("IJs"); kromme.lMengsel = KLabel("Mengsel"); kromme.lWater = KLabel("Water");
+            tRegel = Tekst(rechts, "Regel", "", 12.5f, Lin(KrommeTekst), TextAlignmentOptions.BottomLeft);
+            Hoek(tRegel.rectTransform, Vector2.zero, Vector2.zero, new Vector2(220f, 16f));
+
+            var ukHouder = Maak("UitklapHouder", r1.transform);
+            LE(ukHouder.gameObject, prefW: 40f);
+            var uk = Vlak(ukHouder, "Uitklappen", KnopGlas, 8f);
+            Hoek(uk.rectTransform, new Vector2(1f, 1f), Vector2.zero, new Vector2(40f, 38f));
             uitklapIcoon = Icoon(uk.transform, "Pijl", uitgeklapt ? PijlOmlaag() : PijlOmhoog(), Color.white);
             Vul(uitklapIcoon.rectTransform, 11, 13, 11, 13);
             Knop(uk, () => { uitgeklapt = !uitgeklapt; uitklap.gameObject.SetActive(uitgeklapt); uitklapIcoon.sprite = uitgeklapt ? PijlOmlaag() : PijlOmhoog(); });
+
+            // regel 2: H-bruggen en dichtheid (met label bij het dichtheidsmaximum)
+            var rRho = Rij(paneel.transform, "Dichtheid", 22f, 12f);
+            tBruggen = Tekst(rRho.transform, "Bruggen", "", 12.5f, Lin(KrommeTekst));
+            tRho = Tekst(rRho.transform, "Rho", "", 12.5f, Lin(KrommeTekst));
+            maxPil = Vlak(rRho.transform, "Max", Color.white, 10f);
+            Oranje(maxPil, 10f);
+            maxPil.raycastTarget = false;
+            var maxRij = maxPil.gameObject.AddComponent<HorizontalLayoutGroup>();
+            maxRij.padding = new RectOffset(8, 9, 3, 3); maxRij.spacing = 4f; maxRij.childAlignment = TextAnchor.MiddleCenter;
+            maxRij.childControlWidth = maxRij.childControlHeight = true; maxRij.childForceExpandWidth = maxRij.childForceExpandHeight = false;
+            var maxSter = Icoon(maxPil.transform, "Ster", Ster(), Color.white);
+            LE(maxSter.gameObject, prefW: 11f, prefH: 11f);
+            tMax = Tekst(maxPil.transform, "Tekst", Teksten.T("rho.max"), 11.5f, Color.white, TextAlignmentOptions.Center, true);
+            maxPil.gameObject.SetActive(false);
+            var rhoVrij = Maak("Ruimte", rRho.transform);
+            LE(rhoVrij.gameObject, flexW: 1f);
 
             uitklap = Maak("Bediening", paneel.transform);
             Kolom(uitklap, 0, 8);
@@ -696,12 +752,49 @@ namespace WaterSim.UI
                 statusTimer = 0f;
                 var m = kristal.Model;
                 double T = m.Fase.Temperatuur;
-                string fase = m.Fase.Gesmolten <= 0 ? Teksten.T("fase.ijs") : m.Fase.Gesmolten >= 1 ? Teksten.T("fase.water")
-                            : kristal.temperatuurOmgeving > 0 ? Teksten.T("fase.smelten") : kristal.temperatuurOmgeving < 0 ? Teksten.T("fase.bevriezen") : Teksten.T("fase.mengsel");
+                float omg = kristal.temperatuurOmgeving;
+                bool opPlateau = m.Fase.IsAanHetSmelten;
+                int richting = opPlateau ? (omg > 0f ? 1 : omg < 0f ? -1 : 0) : (omg > T + 0.05 ? 1 : omg < T - 0.05 ? -1 : 0);
+                statusRichting = richting; statusPlateau = opPlateau;
+                int procWater = Mathf.RoundToInt((float)m.Fase.Gesmolten * 100f);
                 tTemp.text = Teksten.Graden(T, 1);
-                tStatus.text = $"<b><color=#FFFFFF>{fase}</color></b> · {Mathf.RoundToInt((float)m.Fase.Gesmolten * 100)}% {Teksten.T("gesmolten")}\n" +
-                               $"{Teksten.Getal(m.BruggenPerMolecuul, "0.0")} {Teksten.T("hbruggen")} · ρ {Teksten.Getal(m.Dichtheid, m.Fase.Gesmolten >= 1 ? "0.00000" : "0.000")}" +   // water: 5 decimalen, anders zie je het maximum bij 4 °C niet
-                               (m.Fase.Gesmolten >= 1 && Math.Abs(T - WaterSim.Sim.Constanten.TemperatuurMaxDichtheid) < 0.5 ? $" <b><color=#F7884D>· {Teksten.T("rho.max")}</color></b>" : "");
+
+                if (opPlateau)
+                {
+                    tRingSub.text = richting < 0 ? string.Format(Teksten.T("ring.ijs"), 100 - procWater) : $"{procWater}%";
+                    tLabel.text = Teksten.T(richting > 0 ? "plateau.smelt" : richting < 0 ? "plateau.stol" : "evenwicht");
+                    labelPil.rectTransform.sizeDelta = new Vector2(tLabel.preferredWidth + 16f, 19f);
+                    double rest = m.Fase.ResterendeTijd(omg);
+                    tRegel.text = richting == 0 ? Teksten.T("regel.evenwicht")
+                        : $"<b><color=#FFFFFF>{Teksten.T(richting > 0 ? "regel.smelten" : "regel.stollen")}</color></b> · {string.Format(Teksten.T("nog"), Duur(rest))}";
+                }
+                else
+                {
+                    tRingSub.text = "";
+                    tFase.text = Teksten.T(m.Fase.Gesmolten <= 0 ? "fase.IJs" : "fase.Water");
+                    tRegel.text = Teksten.T(richting > 0 ? "regel.warmer" : richting < 0 ? "regel.kouder" : "regel.gelijk");
+                }
+                labelPil.gameObject.SetActive(opPlateau);
+                tFase.gameObject.SetActive(!opPlateau);
+                kromme.lIjs.text = Teksten.T("fase.ijs");
+                kromme.lWater.text = Teksten.T("fase.water");
+                kromme.lMengsel.text = Teksten.T(richting < 0 ? "fase.mengsel.stol" : "fase.mengsel");
+                kromme.lNul.text = Teksten.Graden(0, 0);
+
+                bool water = m.Fase.Gesmolten >= 1;
+                tBruggen.text = $"{Teksten.Getal(m.BruggenPerMolecuul, "0.0")} {Teksten.T("hbruggen")}";
+                tRho.text = $"ρ <b><color=#FFFFFF>{Teksten.Getal(m.Dichtheid, water ? "0.00000" : "0.000")}</color></b> g/cm³";   // water: 5 decimalen, anders zie je het maximum bij 4 °C niet
+                bool max = water && Math.Abs(T - WaterSim.Sim.Constanten.TemperatuurMaxDichtheid) < 0.5;
+                if (max != maxPil.gameObject.activeSelf) maxPil.gameObject.SetActive(max);
+            }
+            // ring en kromme elk beeld bijwerken: dan lopen ze vloeiend mee
+            {
+                var f = kristal.Model.Fase;
+                var accent = Lin(statusRichting > 0 ? AccentWarm : statusRichting < 0 ? AccentKoud : AccentRust);
+                float deel = !statusPlateau ? 0f : statusRichting < 0 ? 1f - (float)f.Gesmolten : (float)f.Gesmolten;
+                ring.Zet(deel, accent);
+                labelPil.color = accent;
+                kromme.Zet((float)f.Enthalpie, (float)f.Temperatuur, statusRichting, statusPlateau, accent);
             }
             tOmgeving.text = $"{Teksten.T("omgeving")} <b>{Teksten.Graden(kristal.temperatuurOmgeving, 0, true)}</b>";
             schuif.SetValueWithoutNotify(kristal.temperatuurOmgeving);
@@ -712,6 +805,16 @@ namespace WaterSim.UI
                 if (i == 0) k.t.text = kristal.oneindig ? Teksten.T("oneindig") : Teksten.T("blok");
                 Actief(k.img, k.t, k.aan());
             }
+        }
+
+        int statusRichting; bool statusPlateau;
+
+        // resterende tijd als "6 s" of "2 min"
+        static string Duur(double s)
+        {
+            if (double.IsInfinity(s) || double.IsNaN(s)) return "–";
+            if (s < 59.5) return $"{Math.Max(1, (int)Math.Round(s))} s";
+            return $"{(int)Math.Round(s / 60.0)} min";
         }
 
         // ligt dit schermpunt (pixels, oorsprong linksonder) op een knop of paneel?
