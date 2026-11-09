@@ -482,7 +482,7 @@ namespace WaterSim.UI
             var r4 = Rij(uitklap, "Weergave", 34f, 6f);
             var ruimte = Pilknop(r4.transform, "", WisselRuimte);
             schakelaars.Add((ruimte.img, ruimte.t, () => true));
-            var kal = Pilknop(r4.transform, Teksten.T("kalotten"), () => kristal.kalotten = !kristal.kalotten);
+            var kal = Pilknop(r4.transform, Teksten.T("kalotten"), WisselKalotten);
             schakelaars.Add((kal.img, kal.t, () => kristal.kalotten));
             var hb = Pilknop(r4.transform, Teksten.T("hbruggen"), () => kristal.toonBruggen = !kristal.toonBruggen);
             schakelaars.Add((hb.img, hb.t, () => kristal.toonBruggen));
@@ -573,6 +573,29 @@ namespace WaterSim.UI
                 }
                 // titel en knoppen horen bij het gekozen level
                 Bouw();
+            }
+        }
+
+        // Kalotten bekijk je het best van een afstand: zet het losse blok in beeld; daarna weer terug naar waar je was.
+        bool kalottenZetteBlok;
+        Vector3 kalottenTerugPos, kalottenTerugKijk;
+        void WisselKalotten()
+        {
+            kristal.kalotten = !kristal.kalotten;
+            if (vliegcamera == null) return;
+            var cam = vliegcamera.transform;
+            if (kristal.kalotten)
+            {
+                kalottenTerugPos = cam.position; kalottenTerugKijk = cam.position + cam.forward;
+                kalottenZetteBlok = kristal.oneindig;
+                if (kristal.oneindig) kristal.oneindig = false;
+                vliegcamera.Zet(kristal.BlokKijkpunt, Vector3.zero);
+            }
+            else if (kalottenZetteBlok)
+            {
+                kristal.oneindig = true;
+                vliegcamera.Zet(kalottenTerugPos, kalottenTerugKijk);
+                kalottenZetteBlok = false;
             }
         }
 

@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &1156312033
+--- !u!1 &432452559
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,8 +127,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1156312035}
-  - component: {fileID: 1156312034}
+  - component: {fileID: 432452561}
+  - component: {fileID: 432452560}
   m_Layer: 0
   m_Name: App
   m_TagString: Untagged
@@ -136,29 +136,30 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1156312034
+--- !u!114 &432452560
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1156312033}
+  m_GameObject: {fileID: 432452559}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a2e4cfa471e2d498295dbcaa0400b37e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WaterSim::WaterSim.UI.AppSchil
-  kristal: {fileID: 1400053085}
-  vliegcamera: {fileID: 1401055230}
+  kristal: {fileID: 1190382579}
+  vliegcamera: {fileID: 2136330334}
   ubuntuRegular: {fileID: 12800000, guid: 5c6c81a4983c54b45a64cd7ed2731566, type: 3}
   ubuntuVet: {fileID: 12800000, guid: 442ce8f9e44e6482caf6ba07f336e358, type: 3}
---- !u!4 &1156312035
+  startschermFps: 30
+--- !u!4 &432452561
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1156312033}
+  m_GameObject: {fileID: 432452559}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -167,7 +168,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1219312106
+--- !u!1 &808418107
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -175,8 +176,136 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1219312108}
-  - component: {fileID: 1219312107}
+  - component: {fileID: 808418109}
+  - component: {fileID: 808418108}
+  m_Layer: 0
+  m_Name: Bloom
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &808418108
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 808418107}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
+  m_IsGlobal: 1
+  priority: 0
+  blendDistance: 0
+  weight: 1
+  sharedProfile: {fileID: 11400000, guid: a5c06749903ea49cb9f84e57093ce962, type: 2}
+--- !u!4 &808418109
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 808418107}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1190382578
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1190382580}
+  - component: {fileID: 1190382579}
+  m_Layer: 0
+  m_Name: Kristal
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1190382579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1190382578}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7bbd529f5f95346d1b6a29846bc347a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: WaterSim::WaterSim.Weergave.Kristal
+  nx: 11
+  ny: 7
+  nz: 7
+  zaad: 1
+  temperatuurOmgeving: -10
+  startTemperatuur: -10
+  beweging: 1
+  oneindig: 1
+  kalotten: 0
+  toonWaterstof: 1
+  toonBruggen: 1
+  markeerKanaal: 0
+  doorkijkStraal: 5
+  kalottenSchaal: 0.85
+  pulseren: 1
+  pulsSnelheid: 2.6
+  pulsSterkte: 0.35
+  beeldenPerSeconde: 60
+  nevelStart: 6
+  nevelEind: 14
+  achtergrond: {r: 0.039, g: 0.082, b: 0.125, a: 1}
+  bol: {fileID: 10200, guid: 0000000000000000e000000000000000, type: 0}
+  cilinder: {fileID: 10203, guid: 0000000000000000e000000000000000, type: 0}
+  capsule: {fileID: 10205, guid: 0000000000000000e000000000000000, type: 0}
+  zuurstof: {fileID: 2100000, guid: 03f7c9d7cec664eadbda235e354cb679, type: 2}
+  kanaal: {fileID: 2100000, guid: e9ab34815da1f416e8af65490446d306, type: 2}
+  waterstof: {fileID: 2100000, guid: e680bf1b1545e49599f9f1f11a9adf96, type: 2}
+  staaf: {fileID: 2100000, guid: f9da4daf078c9403790bbee130260bc1, type: 2}
+  brug: {fileID: 2100000, guid: 5dbad685b9bb84765bc9360af56e14a6, type: 2}
+  rand: {fileID: 2100000, guid: 65359738331424a52966f01bf35d2650, type: 2}
+  niveau: {fileID: 2100000, guid: c680d8ed9456744c583023a9770f79ad, type: 2}
+  gladdeBollen: 1
+  zuurstofGlad: {fileID: 2100000, guid: 17f292d18ea39463daceb4b5296347b8, type: 2}
+  kanaalGlad: {fileID: 2100000, guid: 22ba7326824a74fc59c6957c8bf0a038, type: 2}
+  waterstofGlad: {fileID: 2100000, guid: 4a2e1b8bab82d4e3f9c4c320d59fa838, type: 2}
+--- !u!4 &1190382580
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1190382578}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1403078957
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1403078959}
+  - component: {fileID: 1403078958}
   m_Layer: 0
   m_Name: Licht
   m_TagString: Untagged
@@ -184,13 +313,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!108 &1219312107
+--- !u!108 &1403078958
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1219312106}
+  m_GameObject: {fileID: 1403078957}
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
@@ -249,13 +378,13 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!4 &1219312108
+--- !u!4 &1403078959
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1219312106}
+  m_GameObject: {fileID: 1403078957}
   serializedVersion: 2
   m_LocalRotation: {x: 0.40821794, y: -0.23456973, z: 0.10938166, w: 0.8754261}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -264,7 +393,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1400053084
+--- !u!1 &2136330333
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -272,86 +401,12 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1400053086}
-  - component: {fileID: 1400053085}
-  m_Layer: 0
-  m_Name: Kristal
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1400053085
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1400053084}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7bbd529f5f95346d1b6a29846bc347a4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: WaterSim::WaterSim.Weergave.Kristal
-  nx: 11
-  ny: 7
-  nz: 7
-  zaad: 1
-  temperatuurOmgeving: -10
-  startTemperatuur: -10
-  beweging: 1
-  oneindig: 1
-  kalotten: 0
-  toonWaterstof: 1
-  toonBruggen: 1
-  markeerKanaal: 0
-  doorkijkStraal: 5
-  pulseren: 1
-  pulsSnelheid: 2.6
-  pulsSterkte: 0.35
-  beeldenPerSeconde: 60
-  nevelStart: 6
-  nevelEind: 14
-  achtergrond: {r: 0.039, g: 0.082, b: 0.125, a: 1}
-  bol: {fileID: 10200, guid: 0000000000000000e000000000000000, type: 0}
-  cilinder: {fileID: 10203, guid: 0000000000000000e000000000000000, type: 0}
-  capsule: {fileID: 10205, guid: 0000000000000000e000000000000000, type: 0}
-  zuurstof: {fileID: 2100000, guid: 03f7c9d7cec664eadbda235e354cb679, type: 2}
-  kanaal: {fileID: 2100000, guid: e9ab34815da1f416e8af65490446d306, type: 2}
-  waterstof: {fileID: 2100000, guid: e680bf1b1545e49599f9f1f11a9adf96, type: 2}
-  staaf: {fileID: 2100000, guid: f9da4daf078c9403790bbee130260bc1, type: 2}
-  brug: {fileID: 2100000, guid: 5dbad685b9bb84765bc9360af56e14a6, type: 2}
-  rand: {fileID: 2100000, guid: 65359738331424a52966f01bf35d2650, type: 2}
-  niveau: {fileID: 2100000, guid: c680d8ed9456744c583023a9770f79ad, type: 2}
---- !u!4 &1400053086
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1400053084}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1401055229
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1401055235}
-  - component: {fileID: 1401055234}
-  - component: {fileID: 1401055233}
-  - component: {fileID: 1401055232}
-  - component: {fileID: 1401055230}
-  - component: {fileID: 1401055231}
+  - component: {fileID: 2136330339}
+  - component: {fileID: 2136330338}
+  - component: {fileID: 2136330337}
+  - component: {fileID: 2136330336}
+  - component: {fileID: 2136330334}
+  - component: {fileID: 2136330335}
   m_Layer: 0
   m_Name: Camera
   m_TagString: MainCamera
@@ -359,13 +414,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1401055230
+--- !u!114 &2136330334
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1401055229}
+  m_GameObject: {fileID: 2136330333}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 83e3575e0ff874149b57c51076f8a65b, type: 3}
@@ -376,27 +431,27 @@ MonoBehaviour:
   kijkGevoeligheid: 0.15
   vingerVlieg: 0.03
   scrollStap: 0.6
---- !u!114 &1401055231
+--- !u!114 &2136330335
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1401055229}
+  m_GameObject: {fileID: 2136330333}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 62fa9ab79baf245c183b440e2b882728, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WaterSim::WaterSim.UI.Snelheidsmeter
-  kristal: {fileID: 1400053085}
+  kristal: {fileID: 1190382579}
   zichtbaar: 1
---- !u!114 &1401055232
+--- !u!114 &2136330336
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1401055229}
+  m_GameObject: {fileID: 2136330333}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
@@ -434,21 +489,21 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!81 &1401055233
+--- !u!81 &2136330337
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1401055229}
+  m_GameObject: {fileID: 2136330333}
   m_Enabled: 1
---- !u!20 &1401055234
+--- !u!20 &2136330338
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1401055229}
+  m_GameObject: {fileID: 2136330333}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -493,62 +548,13 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &1401055235
+--- !u!4 &2136330339
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1401055229}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2133775526
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2133775528}
-  - component: {fileID: 2133775527}
-  m_Layer: 0
-  m_Name: Bloom
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2133775527
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2133775526}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
-  m_IsGlobal: 1
-  priority: 0
-  blendDistance: 0
-  weight: 1
-  sharedProfile: {fileID: 11400000, guid: a5c06749903ea49cb9f84e57093ce962, type: 2}
---- !u!4 &2133775528
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2133775526}
+  m_GameObject: {fileID: 2136330333}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -561,8 +567,8 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1401055235}
-  - {fileID: 1219312108}
-  - {fileID: 2133775528}
-  - {fileID: 1400053086}
-  - {fileID: 1156312035}
+  - {fileID: 2136330339}
+  - {fileID: 1403078959}
+  - {fileID: 808418109}
+  - {fileID: 1190382580}
+  - {fileID: 432452561}

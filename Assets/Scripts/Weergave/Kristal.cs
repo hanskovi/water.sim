@@ -39,6 +39,8 @@ namespace WaterSim.Weergave
         public bool markeerKanaal = false;
         [Tooltip("Bij kalotten: moleculen binnen deze afstand van de camera (Å) worden weggelaten.")]
         [Range(0f, 10f)] public float doorkijkStraal = 5f;
+        [Tooltip("Kalotten: van-der-Waalsstralen (Bondi: O 1,52 Å, H 1,20 Å) maal deze factor; verhouding H : O blijft juist.")]
+        [Range(0.5f, 1f)] public float kalottenSchaal = 0.85f;
 
         [Header("Pulseren van de H-bruggen")]
         public bool pulseren = true;
@@ -59,6 +61,9 @@ namespace WaterSim.Weergave
         public Mesh cilinder;
         public Mesh capsule;
         public Material zuurstof, kanaal, waterstof, staaf, brug, rand, niveau;
+        [Tooltip("Kalotten met berekende bollen (impostors): perfect rond op elke afstand, snijlijnen O–H zijn echte cirkels, en sneller. Uit = gewone bollen uit driehoekjes. Bol-staaf gebruikt altijd gewone bollen.")]
+        public bool gladdeBollen = true;
+        public Material zuurstofGlad, kanaalGlad, waterstofGlad;
 
         public Watermodel Model { get; private set; }
         /// <summary>Aantal moleculen dat dit beeld getekend is.</summary>
@@ -102,6 +107,48 @@ namespace WaterSim.Weergave
                 for (int g = 0; g < PulsGroepen; g++) brugGroep[g] = new Material(brug) { name = brug.name + " " + g };
             }
             cam = Camera.main;
+            bolLaag = Icosfeer(2);
+            vierkant = new Mesh { name = "Bolvierkant" };
+            vierkant.SetVertices(new List<Vector3> { new Vector3(-1, -1, 0), new Vector3(1, -1, 0), new Vector3(1, 1, 0), new Vector3(-1, 1, 0) });
+            vierkant.SetTriangles(new[] { 0, 2, 1, 0, 3, 2 }, 0);
+            vierkant.bounds = new Bounds(Vector3.zero, Vector3.one * 4f);
+        }
+
+        Mesh bolLaag, vierkant;
+
+        // bol uit driehoeken (icosaëder, n keer verfijnd); straal 0,5 zoals de Unity-bol
+        static Mesh Icosfeer(int verfijn)
+        {
+            float t = (1f + Mathf.Sqrt(5f)) / 2f;
+            var v = new List<Vector3> {
+                new Vector3(-1, t, 0), new Vector3(1, t, 0), new Vector3(-1, -t, 0), new Vector3(1, -t, 0),
+                new Vector3(0, -1, t), new Vector3(0, 1, t), new Vector3(0, -1, -t), new Vector3(0, 1, -t),
+                new Vector3(t, 0, -1), new Vector3(t, 0, 1), new Vector3(-t, 0, -1), new Vector3(-t, 0, 1) };
+            var f = new List<int> { 0,11,5, 0,5,1, 0,1,7, 0,7,10, 0,10,11, 1,5,9, 5,11,4, 11,10,2, 10,7,6, 7,1,8,
+                                    3,9,4, 3,4,2, 3,2,6, 3,6,8, 3,8,9, 4,9,5, 2,4,11, 6,2,10, 8,6,7, 9,8,1 };
+            for (int r = 0; r < verfijn; r++)
+            {
+                var nieuw = new List<int>();
+                var midden = new Dictionary<long, int>();
+                int Mid(int a, int b)
+                {
+                    long k = a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+                    if (midden.TryGetValue(k, out int m)) return m;
+                    v.Add((v[a] + v[b]) * 0.5f); midden[k] = v.Count - 1; return v.Count - 1;
+                }
+                for (int i = 0; i < f.Count; i += 3)
+                {
+                    int a = f[i], b = f[i + 1], c = f[i + 2], ab = Mid(a, b), bc = Mid(b, c), ca = Mid(c, a);
+                    nieuw.AddRange(new[] { a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca });
+                }
+                f = nieuw;
+            }
+            var normalen = new Vector3[v.Count];
+            for (int i = 0; i < v.Count; i++) { normalen[i] = v[i].normalized; v[i] = normalen[i] * 0.5f; }
+            var m2 = new Mesh { name = "Icosfeer" };
+            m2.SetVertices(v); m2.SetNormals(normalen); m2.SetTriangles(f, 0);
+            m2.RecalculateBounds();
+            return m2;
         }
 
         /// <summary>Begint opnieuw: vers ijs (of water) op <paramref name="startT"/> °C, met de omgeving op dezelfde temperatuur.</summary>
@@ -164,8 +211,8 @@ namespace WaterSim.Weergave
             // --- matrices ---
             float t = Time.time;
             float r2 = tekenStraal < float.MaxValue ? tekenStraal * tekenStraal : float.MaxValue;
-            float rO = kalotten ? 1.25f : 0.36f, rH = kalotten ? 0.95f : 0.20f;
-            float dichtbij = kalotten ? doorkijkStraal : 0f, dichtbij2 = dichtbij * dichtbij;
+            float rO = kalotten ? 1.52f * kalottenSchaal : 0.36f, rH = kalotten ? 1.20f * kalottenSchaal : 0.20f;
+            float dichtbij = kalotten && oneindig ? doorkijkStraal : 0f, dichtbij2 = dichtbij * dichtbij;
             var X = Model.X; var Y = Model.Y; var Z = Model.Z; var H = Model.H; var acc = Model.Acceptor;
             nO = nK = nH = nS = 0;
             for (int g = 0; g < PulsGroepen; g++) mB[g].Clear();
@@ -210,9 +257,21 @@ namespace WaterSim.Weergave
                 if (Model.Fase.Gesmolten > 0.02) Niveau(mNiveau, lx * 0.5f, lz * 0.5f, Model.Bovenkant, 0.1f);
             }
 
-            Teken(bol, zuurstof, mO, nO);
-            Teken(bol, kanaal, mK, nK);
-            Teken(bol, waterstof, mH, nH);
+            if (kalotten && gladdeBollen && zuurstofGlad != null && waterstofGlad != null)
+            {
+                // kalotten: berekende bollen, één vierkantje per atoom; de shader rekent de echte bol uit
+                Teken(vierkant, zuurstofGlad, mO, nO);
+                Teken(vierkant, kanaalGlad != null ? kanaalGlad : zuurstofGlad, mK, nK);
+                Teken(vierkant, waterstofGlad, mH, nH);
+            }
+            else
+            {
+                // bol-staaf: gewone bollen; in een los blok met kalotten (zonder gladde bollen) met minder vlakjes
+                var bolNu = kalotten && !oneindig && bolLaag != null ? bolLaag : bol;
+                Teken(bolNu, zuurstof, mO, nO);
+                Teken(bolNu, kanaal, mK, nK);
+                Teken(bolNu, waterstof, mH, nH);
+            }
             Teken(cilinder, staaf, mS, nS);
             Teken(cilinder, rand, mRand);
             Teken(cilinder, niveau, mNiveau);

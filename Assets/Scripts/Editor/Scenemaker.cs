@@ -28,9 +28,21 @@ namespace WaterSim.Editor
             var unlit = Shader.Find("Universal Render Pipeline/Unlit");
             if (lit == null || unlit == null) { Debug.LogError("Water.sim: URP-shaders niet gevonden."); return; }
 
+            // bol-staaf: gewone bollen met de standaardbelichting (zoals het altijd was)
             var zuurstof = Materiaal("Zuurstof", lit, new Color(0.85f, 0.27f, 0.23f), 0.55f);
             var kanaal = Materiaal("Kanaal", lit, new Color(0.95f, 0.66f, 0.23f), 0.55f);
             var waterstof = Materiaal("Waterstof", lit, new Color(0.86f, 0.88f, 0.90f), 0.45f);
+            // kalotten: "berekende bollen" (perfect rond op elke afstand), CPK-kleuren en donkere rand
+            var glad = Shader.Find("WaterSim/AtoomGlad");
+            Material zuurstofGlad = null, kanaalGlad = null, waterstofGlad = null;
+            if (glad != null)
+            {
+                zuurstofGlad = Materiaal("ZuurstofGlad", glad, new Color(0.91f, 0.16f, 0.12f), 0f);
+                kanaalGlad = Materiaal("KanaalGlad", glad, new Color(0.97f, 0.53f, 0.30f), 0f);
+                waterstofGlad = Materiaal("WaterstofGlad", glad, new Color(0.97f, 0.97f, 0.97f), 0f);
+                waterstofGlad.SetFloat("_RandBreedte", 0.28f);
+            }
+            else Debug.LogWarning("Water.sim: shader WaterSim/AtoomGlad niet gevonden; gewone bollen worden gebruikt.");
             var staaf = Materiaal("Binding", lit, new Color(0.70f, 0.74f, 0.77f), 0.30f);
             // HDR-blauw (> 1) zodat alleen de H-bruggen door de bloom gaan gloeien
             var brug = Materiaal("Waterstofbrug", unlit, new Color(0.30f, 0.72f, 2.6f, 0.85f), 0f);
@@ -73,6 +85,7 @@ namespace WaterSim.Editor
             k.capsule = Resources.GetBuiltinResource<Mesh>("Capsule.fbx");
             k.zuurstof = zuurstof; k.kanaal = kanaal; k.waterstof = waterstof; k.staaf = staaf; k.brug = brug;
             k.rand = rand; k.niveau = niveau;
+            k.zuurstofGlad = zuurstofGlad; k.kanaalGlad = kanaalGlad; k.waterstofGlad = waterstofGlad;
             k.achtergrond = Achtergrond;
             camGo.AddComponent<WaterSim.UI.Snelheidsmeter>().kristal = k;
             var app = new GameObject("App").AddComponent<WaterSim.UI.AppSchil>();
