@@ -102,8 +102,8 @@ namespace WaterSim.UI
             ["blok"] = ("Los blok", "Block"),
             ["kalotten"] = ("Kalotten", "Space-fill"),
             ["beweging"] = ("Beweging", "Motion"),
-            ["model"] = ("Model, niet op schaal: smelten gaat veel sneller dan echt; trilling 2× vergroot.",
-                         "Model, not to scale: melting is much faster than in reality; vibration enlarged 2×."),
+            ["model"] = ("Model, niet op schaal: smelten gaat veel sneller dan echt; trilling 2× vergroot en bij kou extra afgezwakt.",
+                         "Model, not to scale: melting is much faster than in reality; vibration enlarged 2× and damped more in the cold."),
         };
     }
 }

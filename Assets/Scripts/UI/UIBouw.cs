@@ -206,6 +206,30 @@ namespace WaterSim.UI
             return new Color(l.r, l.g, l.b, c.a);
         }
 
+        /// <summary>Afgerond vlak met een horizontaal verloop door drie kleuren; de middelste kleur ligt op 'midden' (0..1).</summary>
+        public static Sprite Verloop3(Color links, Color mid, Color rechts, float midden)
+        {
+            string sleutel = "3" + ColorUtility.ToHtmlStringRGBA(links) + ColorUtility.ToHtmlStringRGBA(mid) + ColorUtility.ToHtmlStringRGBA(rechts) + midden.ToString("0.000");
+            if (verlopen.TryGetValue(sleutel, out var s) && s != null) return s;
+            const int w = 256, h = 64, r = SpriteRadius;
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float cx = x < r ? r : x >= w - r ? w - r : x + 0.5f;
+                    float cy = y < r ? r : y >= h - r ? h - r : y + 0.5f;
+                    float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+                    float a = Mathf.Clamp01(r - Mathf.Sqrt(dx * dx + dy * dy) + 0.5f);
+                    float u = (x + 0.5f) / w;
+                    var k = u < midden ? Color.Lerp(links, mid, u / midden) : Color.Lerp(mid, rechts, (u - midden) / (1f - midden));
+                    k.a *= a;
+                    px[y * w + x] = k;
+                }
+            s = Sprite.Create(Textuur(w, h, px), new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
+            verlopen[sleutel] = s;
+            return s;
+        }
+
         public static Sprite Cirkel() => cirkel != null ? cirkel : cirkel = Veelhoek(Rondje(40));
         public static Sprite Ster() => ster != null ? ster : ster = Veelhoek(Stervorm());
         public static Sprite PijlLinks() => pijlLinks != null ? pijlLinks : pijlLinks = Veelhoek(new[] { new Vector2(0.72f, 0.12f), new Vector2(0.72f, 0.88f), new Vector2(0.22f, 0.5f) });

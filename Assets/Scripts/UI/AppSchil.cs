@@ -200,9 +200,11 @@ namespace WaterSim.UI
             return h;
         }
 
+        static readonly Color KnopGlas = new Color(1f, 1f, 1f, 0.12f);
+
         (Image img, TextMeshProUGUI t) Pilknop(Transform ouder, string tekst, Action actie, float flexW = 1f)
         {
-            var img = Vlak(ouder, "Knop " + tekst, Pil, 8f);
+            var img = Vlak(ouder, "Knop " + tekst, KnopGlas, 8f);
             LE(img.gameObject, flexW: flexW);
             var t = Tekst(img.transform, "Tekst", tekst, 13.5f, Color.white, TextAlignmentOptions.Center);
             Vul(t.rectTransform, 4, 0, 4, 0);
@@ -210,10 +212,30 @@ namespace WaterSim.UI
             return (img, t);
         }
 
+        // actief = oranje (zoals op het startscherm), anders licht glas; alleen wisselen als het verandert
         static void Actief(Image img, TextMeshProUGUI t, bool aan)
         {
-            img.color = aan ? PilActief : Pil;
-            t.color = aan ? PilActiefTekst : Color.white;
+            bool nuOranje = img.sprite != RondSprite();
+            if (aan != nuOranje)
+            {
+                if (aan) Oranje(img, 8f);
+                else { img.sprite = RondSprite(); img.type = Image.Type.Sliced; img.pixelsPerUnitMultiplier = 24f / 8f; img.color = KnopGlas; }
+            }
+            t.color = Color.white;
+            t.fontStyle = aan ? FontStyles.Bold : FontStyles.Normal;
+        }
+
+        // donker waterglas voor panelen boven het 3D-kristal (wit glas wordt daar grijzig)
+        Image Waterglas(Transform ouder, string naam, float radius)
+        {
+            var kleur = Lin(Hex("064A63")); kleur.a = 0.74f;
+            var img = Vlak(ouder, naam, kleur, radius);
+            var r = Maak("Rand", img.transform).gameObject.AddComponent<Image>();
+            r.sprite = RandSprite(); r.type = Image.Type.Sliced; r.pixelsPerUnitMultiplier = 24f / radius;
+            r.color = new Color(1f, 1f, 1f, 0.28f); r.raycastTarget = false;
+            Vul(r.rectTransform);
+            r.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            return img;
         }
 
         // ---------- startscherm ----------
@@ -393,7 +415,7 @@ namespace WaterSim.UI
             Kolom(simPagina, 10, 8);
 
             // bovenbalk: terug · level · sterren
-            var balk = Vlak(simPagina, "Bovenbalk", Paneel, 10f);
+            var balk = Waterglas(simPagina, "Bovenbalk", 10f);
             LE(balk.gameObject, prefH: 44f, minH: 44f);
             var bh = balk.gameObject.AddComponent<HorizontalLayoutGroup>();
             bh.padding = new RectOffset(10, 10, 6, 6); bh.spacing = 10;
@@ -401,18 +423,27 @@ namespace WaterSim.UI
             bh.childAlignment = TextAnchor.MiddleLeft;
             var terug = Vlak(balk.transform, "Terug", Color.white, 6f);
             LE(terug.gameObject, prefW: 38f);
-            var tp = Icoon(terug.transform, "Pijl", PijlLinks(), Achtergrond);
+            var tp = Icoon(terug.transform, "Pijl", PijlLinks(), Lin(LaguneHex));
             Vul(tp.rectTransform, 11, 7, 11, 7);
             Knop(terug, () => ToonPagina(Pagina.Start));
             var titel = Tekst(balk.transform, "Titel", $"<b>{level + 1}</b> · {Teksten.T($"level.{level + 1}.titel")}", 15f, Color.white);
             LE(titel.gameObject, flexW: 1f);
+            var sterPil = Vlak(balk.transform, "Sterren", Color.white, 8f);
+            Oranje(sterPil, 8f);
+            LE(sterPil.gameObject, prefW: 58f);
+            var sh = sterPil.gameObject.AddComponent<HorizontalLayoutGroup>();
+            sh.childAlignment = TextAnchor.MiddleCenter; sh.spacing = 4; sh.childControlWidth = sh.childControlHeight = false;
+            sh.childForceExpandWidth = sh.childForceExpandHeight = false;
+            Icoon(sterPil.transform, "Ster", Ster(), Color.white).rectTransform.sizeDelta = new Vector2(12f, 12f);
+            var sa = Tekst(sterPil.transform, "Aantal", PlayerPrefs.GetInt("watersim.sterren", 0).ToString(), 12f, Color.white, TextAlignmentOptions.Center, true);
+            sa.rectTransform.sizeDelta = new Vector2(sa.preferredWidth + 2f, 18f);
 
             // vrije ruimte in het midden: daar kijk en vlieg je rond
             var vrij = Maak("Vrij", simPagina);
             LE(vrij.gameObject, flexH: 1f);
 
             // onderpaneel
-            var paneel = Vlak(simPagina, "Bediening", Paneel, 14f);
+            var paneel = Waterglas(simPagina, "Bediening", 14f);
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
 
@@ -420,9 +451,9 @@ namespace WaterSim.UI
             var r1 = Rij(paneel.transform, "Toestand", 46f, 10f);
             tTemp = Tekst(r1.transform, "Temperatuur", "", 24f, Color.white, TextAlignmentOptions.Left, true);
             LE(tTemp.gameObject, prefW: 118f);
-            tStatus = Tekst(r1.transform, "Status", "", 12.5f, Zacht, TextAlignmentOptions.Left, false, true);
+            tStatus = Tekst(r1.transform, "Status", "", 12.5f, IJsTekst, TextAlignmentOptions.Left, false, true);
             LE(tStatus.gameObject, flexW: 1f);
-            var uk = Vlak(r1.transform, "Uitklappen", Pil, 8f);
+            var uk = Vlak(r1.transform, "Uitklappen", KnopGlas, 8f);
             LE(uk.gameObject, prefW: 40f);
             uitklapIcoon = Icoon(uk.transform, "Pijl", uitgeklapt ? PijlOmlaag() : PijlOmhoog(), Color.white);
             Vul(uitklapIcoon.rectTransform, 11, 13, 11, 13);
@@ -458,7 +489,7 @@ namespace WaterSim.UI
             var bw = Pilknop(r4.transform, Teksten.T("beweging"), () => kristal.beweging = !kristal.beweging);
             schakelaars.Add((bw.img, bw.t, () => kristal.beweging));
 
-            var noot = Tekst(uitklap, "Model", Teksten.T("model"), 10.5f, Grijs, TextAlignmentOptions.Left, false, true);
+            var noot = Tekst(uitklap, "Model", Teksten.T("model"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
             LE(noot.gameObject, prefH: 28f);
         }
 
@@ -472,9 +503,9 @@ namespace WaterSim.UI
             s.minValue = -100f; s.maxValue = 99f; s.wholeNumbers = true;
             s.navigation = new Navigation { mode = Navigation.Mode.None };
 
-            // spoor: blauw (koud) → wit (0 °C) → oranje-rood (warm)
+            // spoor: ijsblauw (koud) → wit (0 °C) → oranje (warm); wit ligt precies op 0 °C
             var spoor = go.transform.Find("Background").GetComponent<Image>();
-            spoor.sprite = Verloop(Koud, Warm2);
+            spoor.sprite = Verloop3(Hex("4AB8FF"), Color.white, OranjeR, Mathf.InverseLerp(-100f, 99f, 0f));
             spoor.type = Image.Type.Sliced; spoor.pixelsPerUnitMultiplier = 24f / 4f;
             spoor.color = Color.white;
             var spoorRt = spoor.rectTransform;
@@ -495,6 +526,10 @@ namespace WaterSim.UI
             duim.sprite = Cirkel();
             duim.color = Color.white;
             s.handleRect.sizeDelta = new Vector2(24f, 0f);
+            var duimRand = Maak("Rand", s.handleRect).gameObject.AddComponent<Image>();   // dun lagune-randje, zodat de witte duim op het witte midden zichtbaar blijft
+            duimRand.sprite = RandSprite(); duimRand.type = Image.Type.Sliced; duimRand.pixelsPerUnitMultiplier = 2f;
+            duimRand.color = Lin(LaguneHex); duimRand.raycastTarget = false;
+            Vul(duimRand.rectTransform);
             if (kristal != null) s.SetValueWithoutNotify(kristal.temperatuurOmgeving);
             s.onValueChanged.AddListener(v => { if (!bouwen && schuifVast) kristal.temperatuurOmgeving = v; });
             var trigger = go.AddComponent<EventTrigger>();

@@ -162,7 +162,9 @@ namespace WaterSim.Sim
         // ---------- ijs: trillen rond de roosterplek; teruggaan na bevriezen ----------
         void IJs(float dt, float bdt, float T)
         {
-            float amp = Beweging ? 2f * 0.15f * (float)Math.Sqrt((Math.Min(T, 0f) + 273.15f) / 273.15f) : 0f;
+            // Trilling: 0,15 Å bij 0 °C, 2× vergroot. Natuurkundig schaalt de uitslag met √T; dat geeft bij −100 °C
+            // nog 80 %, te weinig om te zien. Didactisch versterkt naar T^1,5: −100 °C → 50 %, −200 °C → 14 %.
+            float amp = Beweging ? 2f * 0.15f * (float)Math.Pow((Math.Min(T, 0f) + 273.15f) / 273.15f, 1.5) : 0f;
             for (int i = 0; i < N; i++)
             {
                 if (Vloeibaar[i]) { X[i] = lx[i]; Y[i] = ly[i]; Z[i] = lz[i]; continue; }
