@@ -514,22 +514,125 @@ namespace WaterSim.UI
             var titel = Tekst(balk.transform, "Titel", $"<b>{level + 1}</b> · {Teksten.T($"level.{level + 1}.titel")}", 15f, Color.white);
             LE(titel.gameObject, flexW: 1f);
             if (!verkennen) Sterpil(balk.transform);
+            var fk = Vlak(balk.transform, "Formule", KnopGlas, 8f);
+            LE(fk.gameObject, prefW: 78f);
+            var fkt = Tekst(fk.transform, "Tekst", Teksten.T("formule"), 13f, Color.white, TextAlignmentOptions.Center);
+            Vul(fkt.rectTransform, 4, 0, 4, 0);
+            Knop(fk, () => { toonFormule = !toonFormule; PlayerPrefs.SetInt("watersim.formule", toonFormule ? 1 : 0); });
+            formuleKnop = (fk, fkt);
 
             // vrije ruimte in het midden: daar kijk en vlieg je rond
             var vrij = Maak("Vrij", simPagina);
             LE(vrij.gameObject, flexH: 1f);
             vrijRt = vrij;
             Zoomknoppen(vrij);
+            Formulekaart(vrij);
             if (MolecuulLevel) { BouwMolecuulpaneel(); return; }
             if (IjsLevel) { BouwIjspaneel(); return; }
             BouwKristalpaneel();
+        }
+
+        // ---------- formulekaartje: de structuurformule of vergelijking bij elk level ----------
+        bool toonFormule = true;
+        (Image img, TextMeshProUGUI t) formuleKnop;
+        Image formuleKaart;
+        TextMeshProUGUI tF4a, tF4b;
+        int formuleRichting = 99;
+
+        void Formulekaart(RectTransform vrij)
+        {
+            toonFormule = PlayerPrefs.GetInt("watersim.formule", 1) == 1;
+            formuleKaart = Waterglas(vrij, "Formulekaart", 12f);
+            Hoek(formuleKaart.rectTransform, new Vector2(1f, 1f), new Vector2(0f, -6f), new Vector2(196f, 126f));
+            var vlak = Maak("Tekening", formuleKaart.transform);
+            Hoek(vlak, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(180f, 110f));
+            vlak.pivot = new Vector2(0.5f, 0.5f); vlak.anchoredPosition = Vector2.zero;
+            vlak.gameObject.AddComponent<CanvasRenderer>();
+            var tek = vlak.gameObject.AddComponent<Formuletekening>();
+            tek.raycastTarget = false;
+            formuleKaart.raycastTarget = false;
+
+            Color wit = Color.white, blauw = Lin(Hex("5BC2FF")), licht = Lin(Hex("9FD8FF")), rood = Lin(Hex("E05A4A"));
+            Color dMin = Lin(Hex("FFA99B")), dPlus = Lin(Hex("C7EBFF")), oranje = Lin(Hex("FFB48A")), grijs = Lin(KrommeTekst);
+            TextMeshProUGUI L(string tekst, float x, float y, float grootte, Color kleur, bool vet = false)
+            {
+                var t = Tekst(vlak, "T", tekst, grootte, kleur, TextAlignmentOptions.Center, vet);
+                t.rectTransform.anchorMin = t.rectTransform.anchorMax = new Vector2(0f, 1f);
+                t.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                t.rectTransform.sizeDelta = new Vector2(176f, grootte + 6f);
+                t.rectTransform.anchoredPosition = new Vector2(x, -y);
+                return t;
+            }
+            string G(double v, string f) => Teksten.Getal(v, f);
+            switch (level)                 // level 1 t/m 5 (index 0 t/m 4)
+            {
+                case 0:   // lewisstructuur van H2O
+                    L("O", 90, 44, 20, wit); L("H", 40, 90, 20, wit); L("H", 140, 90, 20, wit);
+                    tek.Streep(new Vector2(81, 53), new Vector2(49, 81), wit); tek.Streep(new Vector2(99, 53), new Vector2(131, 81), wit);
+                    foreach (var p in new[] { new Vector2(77, 25), new Vector2(83, 21), new Vector2(97, 21), new Vector2(103, 25) }) tek.Punt(p, 2f, wit);
+                    tek.Hoekboog(new Vector2(90, 46), 20, 42, 138, licht);
+                    L(G(WaterSim.Sim.Constanten.HoekHOH, "0.0") + "°", 90, 78, 11, licht);
+                    L("δ−", 124, 30, 12, dMin); L("δ+", 20, 102, 12, dPlus); L("δ+", 160, 102, 12, dPlus);
+                    break;
+                case 1:   // twee moleculen met de waterstofbrug
+                    L("O", 34, 56, 17, wit); L("H", 72, 56, 17, wit); L("H", 20, 92, 17, wit);
+                    L("O", 136, 56, 17, wit); L("H", 160, 24, 17, wit); L("H", 160, 92, 17, wit);
+                    tek.Streep(new Vector2(43, 56), new Vector2(64, 56), wit); tek.Streep(new Vector2(30, 65), new Vector2(23, 84), wit);
+                    tek.Streep(new Vector2(143, 49), new Vector2(154, 32), wit); tek.Streep(new Vector2(143, 63), new Vector2(154, 84), wit);
+                    tek.Streep(new Vector2(82, 56), new Vector2(126, 56), blauw, 3.5f, 6f);
+                    L(G(WaterSim.Sim.Constanten.AfstandOO - WaterSim.Sim.Constanten.AfstandOH, "0.00") + " Å", 104, 44, 10, licht);
+                    L("O–H···O ≈ 180°", 92, 80, 10, licht);
+                    break;
+                case 2:   // zeshoek uit ijs Ih
+                    {
+                        var hoek = new Vector2[6];
+                        for (int i = 0; i < 6; i++) { float a = (60f * i - 90f) * Mathf.Deg2Rad; hoek[i] = new Vector2(90, 55) + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 40f; }
+                        for (int i = 0; i < 6; i++)
+                        {
+                            var a = hoek[i]; var b = hoek[(i + 1) % 6]; var h = Vector2.Lerp(a, b, 0.32f);
+                            tek.Streep(a, h, wit); tek.Streep(h, b, blauw, 2.5f, 4.5f); tek.Punt(h, 3.5f, wit);
+                        }
+                        foreach (var o in hoek) { tek.Punt(o, 7f, rood); L("O", o.x, o.y, 9, wit, true); }
+                        L(Teksten.T("kanaal"), 90, 55, 9, licht);
+                    }
+                    break;
+                case 3:   // smelten / stollen als vergelijking (pijl en teken volgen de richting)
+                    tF4a = L("", 90, 30, 17, wit);
+                    tF4b = L("", 90, 58, 13, oranje);
+                    L(string.Format(Teksten.T("formule.4.onder"), G(WaterSim.Sim.Constanten.Smeltwarmte, "0")), 90, 86, 11, grijs);
+                    formuleRichting = 99;
+                    break;
+                case 4:   // dichtheid
+                    L("ρ = m / V", 90, 32, 19, wit);
+                    L(string.Format(Teksten.T("formule.5"), G(WaterSim.Sim.Constanten.DichtheidIjsBinas, "0.000"), G(WaterSim.Sim.Constanten.DichtheidWater(0), "0.000")), 90, 62, 13, wit);
+                    L(Teksten.T("formule.5.onder"), 90, 88, 11, grijs);
+                    break;
+                default:
+                    formuleKaart.gameObject.SetActive(false);
+                    formuleKaart = null;
+                    return;
+            }
+            formuleKaart.gameObject.SetActive(toonFormule);
+        }
+
+        // vergelijking bij level 4: smelten (oranje, ΔH +) of stollen (blauw, ΔH −)
+        void WerkFormuleBij()
+        {
+            if (tF4a == null || formuleRichting == statusRichting) return;
+            formuleRichting = statusRichting;
+            bool stol = statusRichting < 0;
+            double dh = WaterSim.Sim.Constanten.Smeltwarmte * WaterSim.Sim.Constanten.MolaireMassaWater / 1000.0;
+            string pijl = stol ? "<color=#5BC2FF>→</color>" : "<color=#F28A55>→</color>";
+            tF4a.text = stol ? $"H<sub>2</sub>O(l) {pijl} H<sub>2</sub>O(s)" : $"H<sub>2</sub>O(s) {pijl} H<sub>2</sub>O(l)";
+            tF4b.text = $"ΔH = {(stol ? "−" : "+")}{Teksten.Getal(dh, "0.0")} kJ/mol";
+            tF4b.color = Lin(Hex(stol ? "9FD8FF" : "FFB48A"));
         }
 
         // + en − rechts in beeld: dichterbij / verder weg (ook in de editor, waar knijpen niet kan)
         void Zoomknoppen(RectTransform vrij)
         {
             var houder = Maak("Zoom", vrij);
-            Hoek(houder, new Vector2(1f, 0.5f), Vector2.zero, new Vector2(42f, 92f));
+            Hoek(houder, new Vector2(1f, 0f), new Vector2(0f, 4f), new Vector2(42f, 92f));
             for (int i = 0; i < 2; i++)
             {
                 int richting = i == 0 ? 1 : -1;
@@ -801,6 +904,7 @@ namespace WaterSim.UI
                     return;
                 }
                 kristal.Herstart(info.startT, info.oneindig);
+                kristal.trillingVergroting = info.scene == 3 ? 1f : 2f;   // level 3 (structuur): ware grootte
                 if (vliegcamera != null)
                 {
                     vliegcamera.minAfstand = 10f; vliegcamera.maxAfstand = 160f;
@@ -863,6 +967,12 @@ namespace WaterSim.UI
                 return;
             }
             if (vliegcamera != null && vliegcamera.DraaiOm) PasMolecuulcamera(false);
+            if (formuleKaart != null)
+            {
+                if (formuleKaart.gameObject.activeSelf != toonFormule) formuleKaart.gameObject.SetActive(toonFormule);
+                if (formuleKnop.img != null) Actief(formuleKnop.img, formuleKnop.t, toonFormule);
+                WerkFormuleBij();
+            }
             if (MolecuulLevel || IjsLevel)
             {
                 foreach (var k in schakelaars) Actief(k.img, k.t, k.aan());

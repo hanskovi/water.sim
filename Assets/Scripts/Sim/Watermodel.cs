@@ -26,6 +26,8 @@ namespace WaterSim.Sim
         public bool Oneindig = true;
         /// <summary>Trilling en warmtebeweging aan/uit (uit = stilstaand beeld).</summary>
         public bool Beweging = true;
+        /// <summary>Hoeveel keer de trilling van ijs vergroot wordt (1 = ware grootte; 2 = beter zichtbaar).</summary>
+        public float TrillingVergroting = 2f;
         /// <summary>Rekenwerk van de vloeistof verdelen over alle processorkernen.</summary>
         public bool Parallel = true;
 
@@ -162,9 +164,9 @@ namespace WaterSim.Sim
         // ---------- ijs: trillen rond de roosterplek; teruggaan na bevriezen ----------
         void IJs(float dt, float bdt, float T)
         {
-            // Trilling: 0,15 Å bij 0 °C, 2× vergroot. Natuurkundig schaalt de uitslag met √T; dat geeft bij −100 °C
+            // Trilling: 0,15 Å bij 0 °C, maal TrillingVergroting. Natuurkundig schaalt de uitslag met √T; dat geeft bij −100 °C
             // nog 80 %, te weinig om te zien. Didactisch versterkt naar T^1,5: −100 °C → 50 %, −200 °C → 14 %.
-            float amp = Beweging ? 2f * 0.15f * (float)Math.Pow((Math.Min(T, 0f) + 273.15f) / 273.15f, 1.5) : 0f;
+            float amp = Beweging ? TrillingVergroting * (float)Constanten.TrillingIjs * (float)Math.Pow((Math.Min(T, 0f) + 273.15f) / 273.15f, 1.5) : 0f;
             for (int i = 0; i < N; i++)
             {
                 if (Vloeibaar[i]) { X[i] = lx[i]; Y[i] = ly[i]; Z[i] = lz[i]; continue; }

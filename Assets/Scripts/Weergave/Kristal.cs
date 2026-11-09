@@ -27,6 +27,8 @@ namespace WaterSim.Weergave
         public float startTemperatuur = -10f;
         [Tooltip("Trilling en warmtebeweging (trilling van ijs 2× vergroot).")]
         public bool beweging = true;
+        [Tooltip("1 = trilling van ijs op ware grootte, 2 = twee keer zo groot (beter te zien).")]
+        [Range(1f, 3f)] public float trillingVergroting = 2f;
 
         [Header("Ruimte")]
         [Tooltip("Aan: het rooster herhaalt zich in alle richtingen. Uit: een los blok, waarin je ziet dat water krimpt.")]
@@ -200,6 +202,7 @@ namespace WaterSim.Weergave
             klok.Restart();
             Model.Oneindig = oneindig;
             Model.Beweging = beweging;
+            Model.TrillingVergroting = trillingVergroting;
             Model.Stap(Time.deltaTime, temperatuurOmgeving);
             SimulatieMs = (float)klok.Elapsed.TotalMilliseconds;
         }
