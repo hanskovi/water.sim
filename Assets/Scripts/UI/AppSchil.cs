@@ -538,7 +538,8 @@ namespace WaterSim.UI
         Image formuleKaart, formuleDicht;
         string FormuleSleutel => "watersim.formule." + level;      // per level onthouden: open of ingeklapt
         void ZetFormule(bool open) { toonFormule = open; PlayerPrefs.SetInt(FormuleSleutel, open ? 1 : 0); }
-        TextMeshProUGUI tF4a, tF4b;
+        TextMeshProUGUI tF4a, tF4c, tF4b;      // links · rechts van de pijl, en ΔH
+        Formuletekening formuleTek;
         int formuleRichting = 99;
 
         void Formulekaart(RectTransform vrij)
@@ -618,7 +619,9 @@ namespace WaterSim.UI
                     }
                     break;
                 case 3:   // smelten / stollen als vergelijking (pijl en teken volgen de richting)
-                    tF4a = L("", 90, 30, 17, wit);
+                    tF4a = L("", 45, 30, 17, wit);
+                    tF4c = L("", 135, 30, 17, wit);
+                    formuleTek = tek;
                     tF4b = L("", 90, 58, 13, oranje);
                     L(string.Format(Teksten.T("formule.4.onder"), G(WaterSim.Sim.Constanten.Smeltwarmte, "0")), 90, 86, 11, grijs);
                     formuleRichting = 99;
@@ -644,8 +647,14 @@ namespace WaterSim.UI
             formuleRichting = statusRichting;
             bool stol = statusRichting < 0;
             double dh = WaterSim.Sim.Constanten.Smeltwarmte * WaterSim.Sim.Constanten.MolaireMassaWater / 1000.0;
-            string pijl = stol ? "<color=#5BC2FF>→</color>" : "<color=#F28A55>→</color>";
-            tF4a.text = stol ? $"H<sub>2</sub>O(l) {pijl} H<sub>2</sub>O(s)" : $"H<sub>2</sub>O(s) {pijl} H<sub>2</sub>O(l)";
+            // de pijl zelf tekenen (het →-teken zit niet in het lettertype)
+            var kleur = Lin(Hex(stol ? "5BC2FF" : "F28A55"));
+            formuleTek.Wis();
+            formuleTek.Streep(new Vector2(77, 30), new Vector2(103, 30), kleur, 2.2f);
+            formuleTek.Streep(new Vector2(97, 25), new Vector2(103, 30), kleur, 2.2f);
+            formuleTek.Streep(new Vector2(97, 35), new Vector2(103, 30), kleur, 2.2f);
+            tF4a.text = stol ? "H<sub>2</sub>O(l)" : "H<sub>2</sub>O(s)";
+            tF4c.text = stol ? "H<sub>2</sub>O(s)" : "H<sub>2</sub>O(l)";
             tF4b.text = $"ΔH = {(stol ? "−" : "+")}{Teksten.Getal(dh, "0.0")} kJ/mol";
             tF4b.color = Lin(Hex(stol ? "9FD8FF" : "FFB48A"));
         }
