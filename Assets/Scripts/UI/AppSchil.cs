@@ -838,6 +838,8 @@ namespace WaterSim.UI
             level = nieuw;
             PlayerPrefs.SetInt("watersim.level", level);
             infoOpen = false;
+            if (kristal != null) kristal.kalotten = false;     // elk level begint in zijn eigen standaardweergave
+            kalottenZetteBlok = false;
             ToonPagina(Pagina.Sim);
         }
 
