@@ -97,6 +97,7 @@ namespace WaterSim.UI
             ["hbruggen"] = ("H-bruggen", "H-bonds"),
             ["per.molecuul"] = ("per molecuul", "per molecule"),
             ["dichtheid"] = ("dichtheid", "density"),
+            ["rho.max"] = ("ρ max", "ρ max"),
             ["omgeving"] = ("Omgeving", "Surroundings"),
             ["oneindig"] = ("Oneindig", "Infinite"),
             ["blok"] = ("Los blok", "Block"),

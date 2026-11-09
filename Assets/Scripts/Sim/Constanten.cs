@@ -31,13 +31,16 @@ namespace WaterSim.Sim
         public static double DichtheidIjs =>
             MoleculenPerRechthoekigeCel * MolaireMassaWater / (Avogadro * CelvolumeIjs * 1e-24);
 
+        /// <summary>Temperatuur (°C) waarbij vloeibaar water de grootste dichtheid heeft.</summary>
+        public const double TemperatuurMaxDichtheid = 3.98;
+
         /// <summary>
         /// Dichtheid van vloeibaar water (g/cm³) tussen 0 en 100 °C, formule van Thiesen.
         /// Maximum bij 3,98 °C.
         /// </summary>
         public static double DichtheidWater(double t)
         {
-            return 1.0 - (t - 3.98) * (t - 3.98) * (t + 283.0) / (503570.0 * (t + 67.26));
+            return 1.0 - (t - TemperatuurMaxDichtheid) * (t - TemperatuurMaxDichtheid) * (t + 283.0) / (503570.0 * (t + 67.26));
         }
     }
 }
