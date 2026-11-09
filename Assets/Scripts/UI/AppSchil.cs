@@ -767,10 +767,13 @@ namespace WaterSim.UI
             foreach (var t in infoTabs) Actief(t.img, t.t, t.n == infoNiveau);
         }
 
+        RectTransform zoomHouder;
+
         // + en − rechts in beeld: dichterbij / verder weg (ook in de editor, waar knijpen niet kan)
         void Zoomknoppen(RectTransform vrij)
         {
             var houder = Maak("Zoom", vrij);
+            zoomHouder = houder;
             Hoek(houder, new Vector2(1f, 0f), new Vector2(0f, 4f), new Vector2(42f, 92f));
             for (int i = 0; i < 2; i++)
             {
@@ -1100,6 +1103,7 @@ namespace WaterSim.UI
                 return;
             }
             if (vliegcamera != null && vliegcamera.DraaiOm) PasMolecuulcamera(false);
+            if (zoomHouder != null && zoomHouder.gameObject.activeSelf == infoOpen) zoomHouder.gameObject.SetActive(!infoOpen);   // niet over het infovak
             if (infoVak != null && infoVak.gameObject.activeSelf != infoOpen)
             {
                 infoVak.gameObject.SetActive(infoOpen);
