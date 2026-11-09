@@ -140,6 +140,10 @@ namespace WaterSim.Weergave
         }
 
         Mesh bolLaag, vierkant;
+        /// <summary>Klein bolletje voor de stippen van de H-bruggen (ook gebruikt door de molecuulscènes).</summary>
+        public Mesh Stip => stip;
+        /// <summary>Vierkantje voor de berekende bollen (kalotten).</summary>
+        public Mesh Vierkant => vierkant;
 
         // bol uit driehoeken (icosaëder, n keer verfijnd); straal 0,5 zoals de Unity-bol
         static Mesh Icosfeer(int verfijn)
@@ -318,7 +322,7 @@ namespace WaterSim.Weergave
         public Vector3 BlokKijkpunt => new Vector3(Model.Lx * 0.5f + 30f, 16f, Model.Lz * 0.5f + 34f);
 
         // gestippelde H-brug van het H-atoom naar de acceptor: stippen of neon-pilletjes, elk met een lichte kern
-        void Brug(Vector3 h, Vector3 a, List<Matrix4x4> lijst, List<Matrix4x4> kernen)
+        public void Brug(Vector3 h, Vector3 a, List<Matrix4x4> lijst, List<Matrix4x4> kernen)
         {
             var v = a - h;
             float L = v.magnitude;

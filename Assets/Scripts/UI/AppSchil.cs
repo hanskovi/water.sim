@@ -54,15 +54,20 @@ namespace WaterSim.UI
         {
             public bool speelbaar, oneindig;
             public float startT;
-            public LevelInfo(bool s, bool o = true, float t = -10f) { speelbaar = s; oneindig = o; startT = t; }
+            public int scene;                // 0 = kristal, 1 = één molecuul, 2 = twee moleculen met H-brug
+            public LevelInfo(bool s, bool o = true, float t = -10f, int sc = 0) { speelbaar = s; oneindig = o; startT = t; scene = sc; }
         }
         static readonly LevelInfo[] Levels =
         {
-            new LevelInfo(false), new LevelInfo(false),
+            new LevelInfo(true, sc: 1), new LevelInfo(true, sc: 2),
             new LevelInfo(true, true, -10f), new LevelInfo(true, true, -10f), new LevelInfo(true, false, -10f),
             new LevelInfo(false),
         };
         static readonly int[] Snelknoppen = { -20, -5, 4, 20, 80 };   // 4 °C: water heeft dan de grootste dichtheid
+
+        [Header("Demo")]
+        [Tooltip("Verkennen: alleen de simulaties, zonder leagues, sterren en voortgang (die komen terug met de quiz).")]
+        public bool verkennen = true;
 
         [Header("Startscherm")]
         [Tooltip("Beelden per seconde op het startscherm (spaart batterij).")]
@@ -72,6 +77,8 @@ namespace WaterSim.UI
         Pagina pagina = Pagina.Start;
         int level, league;
 
+        Molecuulscene molecuul;
+        bool MolecuulLevel => Levels[level].scene != 0;
         Canvas canvas;
         CanvasScaler schaler;
         RectTransform veilig, kolom, startPagina, simPagina;
@@ -103,6 +110,9 @@ namespace WaterSim.UI
             if (vliegcamera == null) vliegcamera = FindAnyObjectByType<Vliegcamera>();
             if (UIBouw.Regular == null && ubuntuRegular != null) UIBouw.Regular = TMP_FontAsset.CreateFontAsset(ubuntuRegular);
             if (UIBouw.Vet == null && ubuntuVet != null) UIBouw.Vet = TMP_FontAsset.CreateFontAsset(ubuntuVet);
+            molecuul = gameObject.AddComponent<Molecuulscene>();
+            molecuul.bron = kristal; molecuul.font = UIBouw.Regular;
+            molecuul.enabled = false;
             level = Mathf.Clamp(PlayerPrefs.GetInt("watersim.level", 2), 0, Levels.Length - 1);
             league = Mathf.Clamp(PlayerPrefs.GetInt("watersim.league", 1), 0, 2);
 
@@ -368,7 +378,11 @@ namespace WaterSim.UI
             LE(raster.gameObject, prefH: 84f * 2 + 9f);
             for (int i = 0; i < Levels.Length; i++) LevelTegel(raster, i);
 
-            // leagues: glazen strook, de gekozen league oranje
+            // leagues: glazen strook, de gekozen league oranje (niet in de verkenversie)
+            if (!verkennen) Leagues();
+
+            void Leagues()
+            {
             var strook = Glas(startPagina, "Leagues", 9f, 0.10f);
             LE(strook.gameObject, prefH: 42f);
             var lr = strook.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -382,6 +396,7 @@ namespace WaterSim.UI
                 var t = Tekst(pil.transform, "Tekst", Teksten.T("league." + i), 13.5f, Color.white, TextAlignmentOptions.Center, i == league);
                 Vul(t.rectTransform, 4, 0, 4, 0);
                 Knop(pil, () => { league = l; PlayerPrefs.SetInt("watersim.league", l); Bouw(); });
+            }
             }
 
             // uitleg van het gekozen level
@@ -411,7 +426,7 @@ namespace WaterSim.UI
             }
 
             // voortgang direct onder de startknop (dun)
-            Voortgang(startPagina);
+            if (!verkennen) Voortgang(startPagina);
 
             var vrij = Maak("Ruimte", startPagina);
             LE(vrij.gameObject, flexH: 1f);
@@ -494,7 +509,18 @@ namespace WaterSim.UI
             Knop(terug, () => ToonPagina(Pagina.Start));
             var titel = Tekst(balk.transform, "Titel", $"<b>{level + 1}</b> · {Teksten.T($"level.{level + 1}.titel")}", 15f, Color.white);
             LE(titel.gameObject, flexW: 1f);
-            var sterPil = Vlak(balk.transform, "Sterren", Color.white, 8f);
+            if (!verkennen) Sterpil(balk.transform);
+
+            // vrije ruimte in het midden: daar kijk en vlieg je rond
+            var vrij = Maak("Vrij", simPagina);
+            LE(vrij.gameObject, flexH: 1f);
+            if (MolecuulLevel) { BouwMolecuulpaneel(); return; }
+            BouwKristalpaneel();
+        }
+
+        void Sterpil(Transform balk)
+        {
+            var sterPil = Vlak(balk, "Sterren", Color.white, 8f);
             Oranje(sterPil, 8f);
             LE(sterPil.gameObject, prefW: 58f);
             var sh = sterPil.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -503,10 +529,33 @@ namespace WaterSim.UI
             Icoon(sterPil.transform, "Ster", Ster(), Color.white).rectTransform.sizeDelta = new Vector2(12f, 12f);
             var sa = Tekst(sterPil.transform, "Aantal", PlayerPrefs.GetInt("watersim.sterren", 0).ToString(), 12f, Color.white, TextAlignmentOptions.Center, true);
             sa.rectTransform.sizeDelta = new Vector2(sa.preferredWidth + 2f, 18f);
+        }
 
-            // vrije ruimte in het midden: daar kijk en vlieg je rond
-            var vrij = Maak("Vrij", simPagina);
-            LE(vrij.gameObject, flexH: 1f);
+        // onderpaneel voor level 1 en 2: feiten over het molecuul en drie weergaveknoppen
+        void BouwMolecuulpaneel()
+        {
+            var paneel = Waterglas(simPagina, "Bediening", 14f);
+            var pv = Kolom((RectTransform)paneel.transform, 12, 8);
+            pv.childAlignment = TextAnchor.LowerCenter;
+            string G(double v, string f) => Teksten.Getal(v, f);
+            string feiten = Levels[level].scene == 1
+                ? string.Format(Teksten.T("level.1.feiten"), G(WaterSim.Sim.Constanten.HoekHOH, "0.0"), G(WaterSim.Sim.Constanten.AfstandOH, "0.00"))
+                : string.Format(Teksten.T("level.2.feiten"), G(WaterSim.Sim.Constanten.AfstandOO - WaterSim.Sim.Constanten.AfstandOH, "0.00"),
+                                G(WaterSim.Sim.Constanten.AfstandOO, "0.00"), G(WaterSim.Sim.Constanten.AfstandOH, "0.00"));
+            Tekst(paneel.transform, "Feiten", feiten, 13.5f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            var r = Rij(paneel.transform, "Weergave", 34f, 6f);
+            var kal = Pilknop(r.transform, Teksten.T("kalotten"), () => molecuul.kalotten = !molecuul.kalotten);
+            schakelaars.Add((kal.img, kal.t, () => molecuul.kalotten));
+            var lad = Pilknop(r.transform, Teksten.T("ladingen"), () => molecuul.toonLadingen = !molecuul.toonLadingen);
+            schakelaars.Add((lad.img, lad.t, () => molecuul.toonLadingen));
+            var bw = Pilknop(r.transform, Teksten.T("beweging"), () => molecuul.beweging = !molecuul.beweging);
+            schakelaars.Add((bw.img, bw.t, () => molecuul.beweging));
+            var noot = Tekst(paneel.transform, "Model", Teksten.T("model.molecuul"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
+            LE(noot.gameObject, prefH: 28f);
+        }
+
+        void BouwKristalpaneel()
+        {
 
             // onderpaneel
             var paneel = Waterglas(simPagina, "Bediening", 14f);
@@ -680,7 +729,8 @@ namespace WaterSim.UI
 
             Application.targetFrameRate = p == Pagina.Start ? startschermFps : kristal.beeldenPerSeconde;
             // op het startscherm ligt het 3D-kristal stil (de achtergrond dekt alles af): spaart batterij
-            kristal.enabled = p == Pagina.Sim;
+            kristal.enabled = p == Pagina.Sim && !MolecuulLevel;
+            if (molecuul != null) molecuul.enabled = p == Pagina.Sim && MolecuulLevel;
             if (p == Pagina.Start)
             {
                 if (vliegcamera != null) vliegcamera.enabled = false;
@@ -688,9 +738,24 @@ namespace WaterSim.UI
             else
             {
                 var info = Levels[level];
+                if (info.scene != 0)
+                {
+                    // level 1 en 2: dichtbij om één of twee moleculen heen draaien
+                    molecuul.soort = info.scene == 1 ? Molecuulscene.Soort.Molecuul : Molecuulscene.Soort.Paar;
+                    if (vliegcamera != null)
+                    {
+                        vliegcamera.minAfstand = 2.5f; vliegcamera.maxAfstand = 25f;
+                        vliegcamera.DraaiOm = true;
+                        vliegcamera.Zet(info.scene == 1 ? new Vector3(0f, 0.4f, 5f) : new Vector3(0f, 1.6f, 8f), Vector3.zero);
+                        vliegcamera.enabled = true;
+                    }
+                    Bouw();
+                    return;
+                }
                 kristal.Herstart(info.startT, info.oneindig);
                 if (vliegcamera != null)
                 {
+                    vliegcamera.minAfstand = 10f; vliegcamera.maxAfstand = 160f;
                     vliegcamera.DraaiOm = !info.oneindig;
                     if (info.oneindig) vliegcamera.Zet(Vector3.zero, new Vector3(0f, 0f, 1f));
                     else vliegcamera.Zet(kristal.BlokKijkpunt, Vector3.zero);
@@ -747,6 +812,11 @@ namespace WaterSim.UI
             {
                 // de nevel ademt heel langzaam (mist die zacht beweegt)
                 if (nevel != null) nevel.color = new Color(1f, 1f, 1f, 0.27f + 0.05f * Mathf.Sin(Time.unscaledTime * 0.35f));
+                return;
+            }
+            if (MolecuulLevel)
+            {
+                foreach (var k in schakelaars) Actief(k.img, k.t, k.aan());
                 return;
             }
 

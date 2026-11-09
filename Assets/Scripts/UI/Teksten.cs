@@ -117,6 +117,13 @@ namespace WaterSim.UI
             ["blok"] = ("Los blok", "Block"),
             ["kalotten"] = ("Kalotten", "Space-fill"),
             ["beweging"] = ("Beweging", "Motion"),
+            ["ladingen"] = ("δ+ δ−", "δ+ δ−"),
+            ["level.1.feiten"] = ("Hoek H–O–H <b>{0}°</b> · O–H <b>{1} Å</b>\nO trekt harder aan de gedeelde elektronen dan H: O wordt δ−, de H-atomen δ+. Door de gebogen vorm is water een dipool.",
+                                  "H–O–H angle <b>{0}°</b> · O–H <b>{1} Å</b>\nO pulls harder on the shared electrons than H: O becomes δ−, the H atoms δ+. Because the molecule is bent, water is a dipole."),
+            ["level.2.feiten"] = ("H···O <b>{0} Å</b> · O–O <b>{1} Å</b> · O–H <b>{2} Å</b>\nDe δ+ H van het ene molecuul trekt aan een vrij elektronenpaar van de δ− O van het andere. Een waterstofbrug is ongeveer 20× zwakker dan een O–H-binding.",
+                                  "H···O <b>{0} Å</b> · O–O <b>{1} Å</b> · O–H <b>{2} Å</b>\nThe δ+ H of one molecule is attracted to a lone pair on the δ− O of the other. A hydrogen bond is about 20× weaker than an O–H bond."),
+            ["model.molecuul"] = ("Model: afstanden en hoeken op schaal; bij bol-staaf zijn de atomen verkleind, de trilling is vergroot.",
+                                  "Model: distances and angles to scale; in ball-and-stick the atoms are shrunk, the vibration is enlarged."),
             ["model"] = ("Model, niet op schaal: smelten gaat veel sneller dan echt (ook de resterende tijd is modeltijd); trilling 2× vergroot en bij kou extra afgezwakt.",
                          "Model, not to scale: melting is much faster than in reality (the time left is model time too); vibration enlarged 2× and damped more in the cold."),
         };

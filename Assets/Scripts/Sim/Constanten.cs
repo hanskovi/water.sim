@@ -11,6 +11,8 @@ namespace WaterSim.Sim
         public const double IjsC = 7.36;          // Å, hoogte van de cel langs de c-as
         public const double AfstandOO = 2.76;     // Å, O–O-afstand bij een waterstofbrug
         public const double AfstandOH = 0.96;     // Å, covalente O–H-binding
+        public const double HoekHOH = 104.5;      // °, hoek H–O–H in een los watermolecuul
+        public const double HoekTetraeder = 109.47; // °, hoek tussen de bindingsrichtingen in ijs (tetraëder)
         public const int MoleculenPerRechthoekigeCel = 8;   // cel a × a√3 × c
 
         // --- Stofgegevens ---
