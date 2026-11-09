@@ -140,7 +140,7 @@ namespace WaterSim.UI
         {
             bouwen = true;
             if (canvas != null) Destroy(canvas.gameObject);
-            snel.Clear(); schakelaars.Clear();
+            snel.Clear(); schakelaars.Clear(); infoKnoppen.Clear();
 
             var go = new GameObject("Interface", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             go.transform.SetParent(transform, false);
@@ -521,6 +521,7 @@ namespace WaterSim.UI
             vrijRt = vrij;
             Zoomknoppen(vrij);
             Formulekaart(vrij);
+            Infovak(vrij);
             if (MolecuulLevel) { BouwMolecuulpaneel(); return; }
             if (IjsLevel) { BouwIjspaneel(); return; }
             BouwKristalpaneel();
@@ -643,6 +644,123 @@ namespace WaterSim.UI
             tF4b.color = Lin(Hex(stol ? "9FD8FF" : "FFB48A"));
         }
 
+        // ---------- uitleg: korte beschrijving in het paneel, meer wetenschap in het infovak ----------
+
+        // "wat je ziet", zonder getallen, met rechts het infobolletje
+        void Beschrijving(Image paneel, string sleutel)
+        {
+            var t = Tekst(paneel.transform, "Beschrijving", Teksten.T(sleutel), 13.5f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            t.margin = new Vector4(0f, 0f, 40f, 0f);
+            var ik = Infoknop(paneel.transform);
+            ik.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            Hoek(ik.rectTransform, new Vector2(1f, 1f), new Vector2(-10f, -10f), new Vector2(32f, 32f));
+        }
+
+        // rond "i"-knopje dat het infovak opent en sluit
+        Image Infoknop(Transform ouder)
+        {
+            var k = Vlak(ouder, "Info", Color.white, 16f);
+            k.sprite = Cirkel(); k.type = Image.Type.Simple; k.color = new Color(1f, 1f, 1f, 0.16f);
+            var rand = Maak("Rand", k.transform).gameObject.AddComponent<Image>();
+            rand.sprite = Cirkel(); rand.color = new Color(1f, 1f, 1f, 0.0f); rand.raycastTarget = false;
+            var t = Tekst(k.transform, "i", "i", 18f, Color.white, TextAlignmentOptions.Center, true);
+            Vul(t.rectTransform, 0, 1, 0, 0);
+            Knop(k, () => { infoOpen = !infoOpen; });
+            infoKnoppen.Add(k);
+            return k;
+        }
+
+        bool infoOpen;
+        int infoNiveau;
+        Image infoVak;
+        TextMeshProUGUI infoTekst;
+        readonly List<(Image img, TextMeshProUGUI t, int n)> infoTabs = new List<(Image, TextMeshProUGUI, int)>();
+        readonly List<Image> infoKnoppen = new List<Image>();
+
+        // getallen voor de infoteksten (allemaal uit Constanten), zodat de teksten geen losse waarden bevatten
+        static object[] InfoGetallen()
+        {
+            string G(double v, string f) => Teksten.Getal(v, f);
+            double oh = WaterSim.Sim.Constanten.AfstandOH, oo = WaterSim.Sim.Constanten.AfstandOO;
+            return new object[]
+            {
+                G(oh, "0.00"), G(oo, "0.00"), G(oo - oh, "0.00"),                                         // {0} O–H, {1} O–O, {2} H···O (Å)
+                G(WaterSim.Sim.Constanten.HoekHOH, "0.0"), G(WaterSim.Sim.Constanten.HoekTetraeder, "0.0"),     // {3} H–O–H, {4} tetraëder (°)
+                G(WaterSim.Sim.Constanten.DichtheidIjsBinas, "0.000"), G(WaterSim.Sim.Constanten.DichtheidWater(WaterSim.Sim.Constanten.TemperatuurMaxDichtheid), "0.000"),  // {5} ρ ijs, {6} ρ water max
+                G(WaterSim.Sim.Constanten.Smeltwarmte, "0"),                                                    // {7} J/g
+                G(WaterSim.Sim.Constanten.Smeltwarmte * WaterSim.Sim.Constanten.MolaireMassaWater / 1000.0, "0.0"),  // {8} kJ/mol
+                G(WaterSim.Sim.Constanten.SoortelijkeWarmteWater, "0.00"), G(WaterSim.Sim.Constanten.SoortelijkeWarmteIjs, "0.0"),  // {9} c water, {10} c ijs
+                G(oh / 10.0, "0.000"),                                                                          // {11} O–H in nm
+                G(WaterSim.Sim.Constanten.MolaireMassaWater, "0.0"),                                            // {12} M
+                G(WaterSim.Sim.Constanten.TemperatuurMaxDichtheid, "0"),                                        // {13} °C
+                G(WaterSim.Sim.Constanten.IjsA, "0.00"), G(WaterSim.Sim.Constanten.IjsC, "0.00"),               // {14} a, {15} c (Å)
+            };
+        }
+
+        // infovak boven het paneel: meer uitleg per niveau (onderbouw · bovenbouw · XPRT), half doorzichtig over het beeld
+        void Infovak(RectTransform vrij)
+        {
+            infoTabs.Clear();
+            infoNiveau = Mathf.Clamp(PlayerPrefs.GetInt("watersim.infoniveau", league), 0, 2);
+            var kleur = Lin(Hex("05293A")); kleur.a = 0.9f;
+            infoVak = Vlak(vrij, "Infovak", kleur, 14f);
+            Vul(infoVak.rectTransform, 0f, 6f, 0f, 6f);
+            var rand = Maak("Rand", infoVak.transform).gameObject.AddComponent<Image>();
+            rand.sprite = RandSprite(); rand.type = Image.Type.Sliced; rand.pixelsPerUnitMultiplier = 24f / 14f;
+            rand.color = new Color(1f, 1f, 1f, 0.3f); rand.raycastTarget = false;
+            Vul(rand.rectTransform);
+            rand.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            var kv = Kolom((RectTransform)infoVak.transform, 12, 8);
+            kv.childAlignment = TextAnchor.UpperLeft;
+
+            // kop: titel en sluiten
+            var kop = Rij(infoVak.transform, "Kop", 28f, 8f);
+            var titel = Tekst(kop.transform, "Titel", $"<b>{Teksten.T("info.titel")}</b> · {level + 1} · {Teksten.T($"level.{level + 1}.titel")}", 14.5f, Color.white);
+            LE(titel.gameObject, flexW: 1f);
+            var sluit = Vlak(kop.transform, "Sluiten", KnopGlas, 8f);
+            LE(sluit.gameObject, prefW: 30f);
+            var x = Tekst(sluit.transform, "x", "×", 20f, Color.white, TextAlignmentOptions.Center);
+            Vul(x.rectTransform, 0, 2, 0, 0);
+            Knop(sluit, () => infoOpen = false);
+
+            // niveaus
+            var tabs = Rij(infoVak.transform, "Niveaus", 30f, 6f);
+            for (int i = 0; i < 3; i++)
+            {
+                int n = i;
+                var p = Pilknop(tabs.transform, Teksten.T("league." + i), () => { infoNiveau = n; PlayerPrefs.SetInt("watersim.infoniveau", n); VulInfo(); });
+                p.t.fontSize = 12.5f;
+                infoTabs.Add((p.img, p.t, n));
+            }
+
+            // tekst in een schuifvlak (lange uitleg past dan altijd)
+            var venster = Maak("Venster", infoVak.transform);
+            LE(venster.gameObject, flexH: 1f);
+            venster.gameObject.AddComponent<RectMask2D>();
+            var inhoud = Maak("Inhoud", venster);
+            inhoud.anchorMin = new Vector2(0f, 1f); inhoud.anchorMax = new Vector2(1f, 1f); inhoud.pivot = new Vector2(0.5f, 1f);
+            inhoud.offsetMin = inhoud.offsetMax = Vector2.zero;
+            var iv = Kolom(inhoud, 0, 0);
+            iv.childAlignment = TextAnchor.UpperLeft;
+            inhoud.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            infoTekst = Tekst(inhoud, "Tekst", "", 13.5f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            var scroll = venster.gameObject.AddComponent<ScrollRect>();
+            scroll.content = inhoud; scroll.viewport = venster; scroll.horizontal = false; scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped; scroll.scrollSensitivity = 20f;
+            var vangVlak = venster.gameObject.AddComponent<Image>();      // zodat slepen op de tekst het vlak laat schuiven
+            vangVlak.color = new Color(0f, 0f, 0f, 0.001f);
+
+            VulInfo();
+            infoVak.gameObject.SetActive(infoOpen);
+        }
+
+        void VulInfo()
+        {
+            if (infoTekst == null) return;
+            infoTekst.text = string.Format(Teksten.T($"info.{level + 1}.{infoNiveau}"), InfoGetallen());
+            foreach (var t in infoTabs) Actief(t.img, t.t, t.n == infoNiveau);
+        }
+
         // + en − rechts in beeld: dichterbij / verder weg (ook in de editor, waar knijpen niet kan)
         void Zoomknoppen(RectTransform vrij)
         {
@@ -665,10 +783,7 @@ namespace WaterSim.UI
             var paneel = Waterglas(simPagina, "Bediening", 14f);
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
-            string G(double v, string f) => Teksten.Getal(v, f);
-            Tekst(paneel.transform, "Feiten", string.Format(Teksten.T("level.3.feiten"), G(WaterSim.Sim.Constanten.AfstandOO, "0.00"),
-                  G(WaterSim.Sim.Constanten.HoekTetraeder, "0.0"), G(WaterSim.Sim.Constanten.DichtheidIjsBinas, "0.000")),
-                  13.5f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            Beschrijving(paneel, "level.3.zie");
             var r = Rij(paneel.transform, "Weergave", 34f, 6f);
             var kal = Pilknop(r.transform, Teksten.T("kalotten"), WisselKalotten);
             schakelaars.Add((kal.img, kal.t, () => kristal.kalotten));
@@ -701,12 +816,7 @@ namespace WaterSim.UI
             var paneel = Waterglas(simPagina, "Bediening", 14f);
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
-            string G(double v, string f) => Teksten.Getal(v, f);
-            string feiten = Levels[level].scene == 1
-                ? string.Format(Teksten.T("level.1.feiten"), G(WaterSim.Sim.Constanten.HoekHOH, "0.0"), G(WaterSim.Sim.Constanten.AfstandOH, "0.00"))
-                : string.Format(Teksten.T("level.2.feiten"), G(WaterSim.Sim.Constanten.AfstandOO - WaterSim.Sim.Constanten.AfstandOH, "0.00"),
-                                G(WaterSim.Sim.Constanten.AfstandOO, "0.00"), G(WaterSim.Sim.Constanten.AfstandOH, "0.00"));
-            Tekst(paneel.transform, "Feiten", feiten, 13.5f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            Beschrijving(paneel, Levels[level].scene == 1 ? "level.1.zie" : "level.2.zie");
             var r = Rij(paneel.transform, "Weergave", 34f, 6f);
             var kal = Pilknop(r.transform, Teksten.T("kalotten"), () => molecuul.kalotten = !molecuul.kalotten);
             schakelaars.Add((kal.img, kal.t, () => molecuul.kalotten));
@@ -765,6 +875,8 @@ namespace WaterSim.UI
 
             var ukHouder = Maak("UitklapHouder", r1.transform);
             LE(ukHouder.gameObject, prefW: 40f);
+            var ik = Infoknop(ukHouder);
+            Hoek(ik.rectTransform, new Vector2(1f, 0f), new Vector2(-3f, 2f), new Vector2(34f, 34f));
             var uk = Vlak(ukHouder, "Uitklappen", KnopGlas, 8f);
             Hoek(uk.rectTransform, new Vector2(1f, 1f), Vector2.zero, new Vector2(40f, 38f));
             uitklapIcoon = Icoon(uk.transform, "Pijl", uitgeklapt ? PijlOmlaag() : PijlOmhoog(), Color.white);
@@ -982,12 +1094,19 @@ namespace WaterSim.UI
                 return;
             }
             if (vliegcamera != null && vliegcamera.DraaiOm) PasMolecuulcamera(false);
+            if (infoVak != null && infoVak.gameObject.activeSelf != infoOpen)
+            {
+                infoVak.gameObject.SetActive(infoOpen);
+                if (infoOpen) VulInfo();
+            }
+            foreach (var k in infoKnoppen) if (k != null) k.color = infoOpen ? Lin(OranjeL) : new Color(1f, 1f, 1f, 0.16f);
             if (formuleKaart != null)
             {
-                if (formuleKaart.gameObject.activeSelf != toonFormule)
+                bool kaartZichtbaar = toonFormule && !infoOpen, knopZichtbaar = !toonFormule && !infoOpen;
+                if (formuleKaart.gameObject.activeSelf != kaartZichtbaar || formuleDicht.gameObject.activeSelf != knopZichtbaar)
                 {
-                    formuleKaart.gameObject.SetActive(toonFormule);
-                    formuleDicht.gameObject.SetActive(!toonFormule);
+                    formuleKaart.gameObject.SetActive(kaartZichtbaar);
+                    formuleDicht.gameObject.SetActive(knopZichtbaar);
                 }
                 WerkFormuleBij();
             }
