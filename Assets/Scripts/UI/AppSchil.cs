@@ -211,8 +211,13 @@ namespace WaterSim.UI
         GridLayoutGroup levelRaster;
         void PasKolomAan()
         {
-            if (veilig == null || kolom == null) return;
-            float w = veilig.rect.width;
+            if (veilig == null || kolom == null || schaler == null || Screen.width <= 0 || Screen.height <= 0) return;
+            // breedte van de veilige zone in canvas-eenheden, zelf uitgerekend zoals de CanvasScaler dat doet
+            // (logaritmisch mengen van breedte en hoogte). Unity schaalt het canvas pas een beeld later; met
+            // veilig.rect zou het eerste beeld in pixels rekenen en de kolom even verkeerd staan.
+            var r = schaler.referenceResolution;
+            float schaal = Mathf.Pow(2f, Mathf.Lerp(Mathf.Log(Screen.width / r.x, 2f), Mathf.Log(Screen.height / r.y, 2f), schaler.matchWidthOrHeight));
+            float w = Screen.safeArea.width / schaal;
             if (w <= 0f || Mathf.Abs(w - kolomBreedte) < 0.5f) return;
             kolomBreedte = w;
             float zij = Mathf.Max(MinZij, (w - MaxKolom) / 2f);         // smal scherm: kleine marge; breed: kolom van 580
