@@ -141,6 +141,7 @@ namespace WaterSim.UI
             bouwen = true;
             if (canvas != null) Destroy(canvas.gameObject);
             snel.Clear(); schakelaars.Clear(); infoKnoppen.Clear();
+            schuif = null; ring = null; kromme = null;      // alleen level 4 en 5 bouwen deze opnieuw
 
             var go = new GameObject("Interface", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             go.transform.SetParent(transform, false);
@@ -174,7 +175,7 @@ namespace WaterSim.UI
             BouwSim();
             PasSchermAan();
             ToonPagina(pagina, false);
-            if (kristal != null) schuif.SetValueWithoutNotify(kristal.temperatuurOmgeving);
+            if (kristal != null && schuif != null) schuif.SetValueWithoutNotify(kristal.temperatuurOmgeving);   // level 1-3 hebben geen schuif
             bouwen = false;
         }
 
