@@ -54,13 +54,13 @@ namespace WaterSim.UI
         {
             public bool speelbaar, oneindig;
             public float startT;
-            public int scene;                // 0 = kristal met temperatuur, 1 = één molecuul, 2 = twee moleculen met H-brug, 3 = ijsstructuur
+            public int scene;                // 0 = kristal met temperatuur, 1 = één molecuul, 2 = twee moleculen met H-brug, 3 = ijsstructuur, 4 = glas en meer
             public LevelInfo(bool s, bool o = true, float t = -10f, int sc = 0) { speelbaar = s; oneindig = o; startT = t; scene = sc; }
         }
         static readonly LevelInfo[] Levels =
         {
             new LevelInfo(true, sc: 1), new LevelInfo(true, sc: 2),
-            new LevelInfo(true, true, -10f, 3), new LevelInfo(true, true, -10f), new LevelInfo(true, false, -10f),
+            new LevelInfo(true, true, -10f, 3), new LevelInfo(true, true, -10f), new LevelInfo(true, sc: 4),
             new LevelInfo(false),
         };
         static readonly int[] Snelknoppen = { -20, -5, 4, 20, 80 };   // 4 °C: water heeft dan de grootste dichtheid
@@ -80,6 +80,7 @@ namespace WaterSim.UI
         Molecuulscene molecuul;
         bool MolecuulLevel => Levels[level].scene == 1 || Levels[level].scene == 2;
         bool IjsLevel => Levels[level].scene == 3;
+        bool MacroLevel => Levels[level].scene == 4;
         RectTransform vrijRt;
         int pasCameraAan;              // over zoveel beelden de camera-afstand aanpassen aan het molecuul
         bool laatsteKalotten;
@@ -141,7 +142,8 @@ namespace WaterSim.UI
             bouwen = true;
             if (canvas != null) Destroy(canvas.gameObject);
             snel.Clear(); schakelaars.Clear(); infoKnoppen.Clear();
-            schuif = null; ring = null; kromme = null;      // alleen level 4 en 5 bouwen deze opnieuw
+            schuif = null; ring = null; kromme = null;      // alleen level 4 bouwt deze opnieuw
+            zoomHouder = null; glasW = null; meerW = null; luchtSchuif = null;
 
             var go = new GameObject("Interface", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             go.transform.SetParent(transform, false);
@@ -535,9 +537,10 @@ namespace WaterSim.UI
             var vrij = Maak("Vrij", simPagina);
             LE(vrij.gameObject, flexH: 1f);
             vrijRt = vrij;
-            Zoomknoppen(vrij);
+            if (MacroLevel) BouwMacro(vrij); else Zoomknoppen(vrij);
             Formulekaart(vrij);
             Infovak(vrij);
+            if (MacroLevel) { BouwMacropaneel(); return; }
             if (MolecuulLevel) { BouwMolecuulpaneel(); return; }
             if (IjsLevel) { BouwIjspaneel(); return; }
             BouwKristalpaneel();
@@ -843,6 +846,169 @@ namespace WaterSim.UI
             ToonPagina(Pagina.Sim);
         }
 
+        // ---------- level 5: glas en meer ----------
+        WaterSim.Sim.Meer meer;
+        int macroModus;              // 0 = glas, 1 = meer
+        int vloeistofKeuze;          // 0 = zoet water, 1 = zeewater, 2 = alcohol
+        float luchtT = -5f;
+        Glasweergave glasW;
+        Meerweergave meerW;
+        Slider luchtSchuif;
+        TextMeshProUGUI tLucht, tMeerStatus, tGlasStatus;
+        const float DagenPerSeconde = 1f;          // model: 1 seconde = 1 dag
+
+        static double DichtheidVloeistof(int k) => k == 1 ? WaterSim.Sim.Constanten.DichtheidZeewater
+                                                 : k == 2 ? WaterSim.Sim.Constanten.DichtheidEthanol
+                                                 : WaterSim.Sim.Constanten.DichtheidWater(0);
+
+        void BouwMacro(RectTransform vrij)
+        {
+            macroModus = PlayerPrefs.GetInt("watersim.macro", 0);
+            vloeistofKeuze = PlayerPrefs.GetInt("watersim.vloeistof", 0);
+            var vlak = Maak("Scene", vrij);
+            Vul(vlak, 4, 4, 4, 4);
+            vlak.gameObject.AddComponent<CanvasRenderer>();
+            var licht = Lin(KrommeTekst);
+            if (macroModus == 0)
+            {
+                glasW = vlak.gameObject.AddComponent<Glasweergave>();
+                glasW.raycastTarget = false;
+                glasW.lBoven = Tekst(vlak, "Boven", "", 12.5f, Lin(Hex("FFB48A")), TextAlignmentOptions.Left, true);
+                glasW.lOnder = Tekst(vlak, "Onder", "", 12.5f, Lin(Hex("9FD8FF")), TextAlignmentOptions.Left, true);
+                foreach (var l in new[] { glasW.lBoven, glasW.lOnder }) l.rectTransform.sizeDelta = new Vector2(110f, 18f);
+                // inzoomvensters links en rechts onderin
+                for (int i = 0; i < 2; i++)
+                {
+                    var z = Maak(i == 0 ? "Inzoom ijs" : "Inzoom water", vlak);
+                    Hoek(z, new Vector2(i == 0 ? 0f : 1f, 0f), new Vector2(i == 0 ? 6f : -6f, 22f), new Vector2(92f, 92f));
+                    z.gameObject.AddComponent<CanvasRenderer>();
+                    var g = z.gameObject.AddComponent<Inzoom>();
+                    g.water = i == 1; g.raycastTarget = false;
+                    g.rand = Lin(Hex(i == 0 ? "5BC2FF" : "F28A55"));
+                    var lab = Tekst(z, "Naam", Teksten.T(i == 0 ? "inzoom.ijs" : "inzoom.water"), 11f, licht, TextAlignmentOptions.Top);
+                    lab.rectTransform.anchorMin = new Vector2(0f, 0f); lab.rectTransform.anchorMax = new Vector2(1f, 0f);
+                    lab.rectTransform.pivot = new Vector2(0.5f, 1f); lab.rectTransform.sizeDelta = new Vector2(40f, 16f);
+                    lab.rectTransform.anchoredPosition = new Vector2(0f, -3f);
+                }
+            }
+            else
+            {
+                meerW = vlak.gameObject.AddComponent<Meerweergave>();
+                meerW.raycastTarget = false;
+                meerW.meer = meer;
+                meerW.koud = Lin(Hex("9ED9F0")); meerW.vier = Lin(Hex("0E3F66")); meerW.warm = Lin(Hex("2C7F78"));
+                meerW.bodem = Lin(Hex("3B2A1C")); meerW.vis = Lin(Hex("FFB48A"));
+                foreach (float d in new[] { 0.5f, 2f, 4f, 5.6f })
+                {
+                    var t = Tekst(vlak, "Diepte", "", 11.5f, Color.white, TextAlignmentOptions.Right);
+                    t.rectTransform.sizeDelta = new Vector2(120f, 16f);
+                    t.outlineWidth = 0.2f; t.outlineColor = new Color32(4, 16, 26, 230);
+                    meerW.diepteLabels.Add((t, d));
+                }
+                meerW.lIjs = Tekst(vlak, "IJs", "", 12f, Color.white, TextAlignmentOptions.BottomLeft, true);
+                meerW.lIjs.rectTransform.sizeDelta = new Vector2(120f, 16f);
+                tLucht = Tekst(vlak, "Lucht", "", 12.5f, licht, TextAlignmentOptions.TopLeft);
+                Hoek(tLucht.rectTransform, new Vector2(0f, 1f), new Vector2(12f, -8f), new Vector2(160f, 18f));
+            }
+        }
+
+        void BouwMacropaneel()
+        {
+            var paneel = Waterglas(simPagina, "Bediening", 14f);
+            var pv = Kolom((RectTransform)paneel.transform, 12, 8);
+            pv.childAlignment = TextAnchor.LowerCenter;
+            Beschrijving(paneel, macroModus == 0 ? "level.5.zie.glas" : "level.5.zie.meer");
+
+            var tabs = Rij(paneel.transform, "Modus", 34f, 6f);
+            for (int i = 0; i < 2; i++)
+            {
+                int m = i;
+                var p = Pilknop(tabs.transform, Teksten.T(i == 0 ? "glas" : "meer"), () => { macroModus = m; PlayerPrefs.SetInt("watersim.macro", m); Bouw(); });
+                schakelaars.Add((p.img, p.t, () => macroModus == m));
+            }
+            if (macroModus == 0)
+            {
+                var r = Rij(paneel.transform, "Vloeistof", 34f, 6f);
+                for (int i = 0; i < 3; i++)
+                {
+                    int k = i;
+                    var p = Pilknop(r.transform, Teksten.T("vloeistof." + i), () => { vloeistofKeuze = k; PlayerPrefs.SetInt("watersim.vloeistof", k); });
+                    p.t.fontSize = 12.5f;
+                    schakelaars.Add((p.img, p.t, () => vloeistofKeuze == k));
+                }
+                tGlasStatus = Tekst(paneel.transform, "Status", "", 13f, IJsTekst, TextAlignmentOptions.Left, false, true);
+            }
+            else
+            {
+                var r = Rij(paneel.transform, "Lucht", 34f, 10f);
+                var lab = Tekst(r.transform, "Label", Teksten.T("lucht"), 13.5f, Color.white);
+                LE(lab.gameObject, prefW: 52f);
+                var go = DefaultControls.CreateSlider(new DefaultControls.Resources());
+                go.name = "Luchtschuif"; go.transform.SetParent(r.transform, false);
+                LE(go, flexW: 1f);
+                luchtSchuif = go.GetComponent<Slider>();
+                luchtSchuif.minValue = -15f; luchtSchuif.maxValue = 25f; luchtSchuif.wholeNumbers = true;
+                luchtSchuif.navigation = new Navigation { mode = Navigation.Mode.None };
+                var spoor = go.transform.Find("Background").GetComponent<Image>();
+                spoor.sprite = Verloop3(Hex("4AB8FF"), Color.white, OranjeR, Mathf.InverseLerp(-15f, 25f, 0f));
+                spoor.type = Image.Type.Sliced; spoor.pixelsPerUnitMultiplier = 24f / 4f; spoor.color = Color.white;
+                spoor.rectTransform.anchorMin = new Vector2(0f, 0.5f); spoor.rectTransform.anchorMax = new Vector2(1f, 0.5f);
+                spoor.rectTransform.sizeDelta = new Vector2(0f, 8f);
+                go.transform.Find("Fill Area").gameObject.SetActive(false);
+                luchtSchuif.fillRect = null;
+                var duim = luchtSchuif.handleRect.GetComponent<Image>();
+                duim.sprite = Cirkel(); duim.color = Color.white;
+                luchtSchuif.handleRect.sizeDelta = new Vector2(24f, 0f);
+                luchtSchuif.SetValueWithoutNotify(luchtT);
+                luchtSchuif.onValueChanged.AddListener(v => luchtT = v);
+                var w = Tekst(r.transform, "Waarde", "", 13.5f, Color.white, TextAlignmentOptions.Right, true);
+                LE(w.gameObject, prefW: 58f);
+                tLuchtWaarde = w;
+
+                var r2 = Rij(paneel.transform, "Meerstatus", 30f, 8f);
+                tMeerStatus = Tekst(r2.transform, "Status", "", 13f, IJsTekst);
+                LE(tMeerStatus.gameObject, flexW: 1f);
+                var opn = Pilknop(r2.transform, Teksten.T("opnieuw"), () => meer = new WaterSim.Sim.Meer(24, 6, 12), 0f);
+                LE(opn.img.gameObject, prefW: 96f);
+            }
+            var noot = Tekst(paneel.transform, "Model", Teksten.T(macroModus == 0 ? "model.glas" : "model.meer"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
+            LE(noot.gameObject, prefH: 28f);
+        }
+
+        TextMeshProUGUI tLuchtWaarde;
+
+        void WerkMacroBij()
+        {
+            if (macroModus == 0 && glasW != null)
+            {
+                double rhoIjs = WaterSim.Sim.Constanten.DichtheidIjsBinas, rhoV = DichtheidVloeistof(vloeistofKeuze);
+                bool drijft = WaterSim.Sim.Drijven.Drijft(rhoIjs, rhoV);
+                float onder = (float)WaterSim.Sim.Drijven.DeelOnder(rhoIjs, rhoV);
+                glasW.deelOnder = onder; glasW.zinkt = !drijft;
+                glasW.vloeistof = vloeistofKeuze == 2 ? new Color(0.75f, 0.82f, 0.86f, 0.32f) : Lin(Hex(vloeistofKeuze == 1 ? "1A6A8C" : "1E7FA8")) * new Color(1f, 1f, 1f, 0.6f);
+                int pOnder = Mathf.RoundToInt(onder * 100f);
+                glasW.lBoven.text = drijft ? string.Format(Teksten.T("glas.boven"), 100 - pOnder) : "";
+                glasW.lOnder.text = drijft ? string.Format(Teksten.T("glas.onder"), pOnder) : Teksten.T("glas.zinkt");
+                if (tGlasStatus != null) tGlasStatus.text = Teksten.T(drijft ? (vloeistofKeuze == 1 ? "glas.status.zee" : "glas.status.drijft") : "glas.status.zinkt");
+            }
+            else if (macroModus == 1 && meerW != null && meer != null)
+            {
+                meer.Stap(Time.deltaTime * DagenPerSeconde * 86400.0, luchtT);
+                meerW.meer = meer;
+                for (int i = 0; i < meerW.diepteLabels.Count; i++)
+                {
+                    var (t, d) = meerW.diepteLabels[i];
+                    int laag = Mathf.Clamp((int)(d / meer.Diepte * meer.Lagen), 0, meer.Lagen - 1);
+                    t.text = $"{Teksten.Getal(d, "0.#")} m · <b>{Teksten.Graden(meer.T[laag], 1)}</b>";
+                }
+                meerW.lIjs.text = meer.Ijsdikte > 0.003 ? string.Format(Teksten.T("meer.ijs"), Teksten.Getal(meer.Ijsdikte * 100, "0")) : "";
+                if (tLucht != null) tLucht.text = $"{Teksten.T("lucht")} {Teksten.Graden(luchtT, 0, true)}";
+                if (tLuchtWaarde != null) tLuchtWaarde.text = Teksten.Graden(luchtT, 0, true);
+                if (tMeerStatus != null)
+                    tMeerStatus.text = string.Format(Teksten.T("meer.status"), (int)(meer.Tijd / 86400.0), Teksten.Graden(meer.Bodem, 1));
+            }
+        }
+
         void Sterpil(Transform balk)
         {
             var sterPil = Vlak(balk, "Sterren", Color.white, 8f);
@@ -1051,7 +1217,7 @@ namespace WaterSim.UI
 
             Application.targetFrameRate = p == Pagina.Start ? startschermFps : kristal.beeldenPerSeconde;
             // op het startscherm ligt het 3D-kristal stil (de achtergrond dekt alles af): spaart batterij
-            kristal.enabled = p == Pagina.Sim && !MolecuulLevel;
+            kristal.enabled = p == Pagina.Sim && !MolecuulLevel && !MacroLevel;
             if (molecuul != null) molecuul.enabled = p == Pagina.Sim && MolecuulLevel;
             if (p == Pagina.Start)
             {
@@ -1060,7 +1226,15 @@ namespace WaterSim.UI
             else
             {
                 var info = Levels[level];
-                if (info.scene != 0)
+                if (info.scene == 4)
+                {
+                    // level 5: glas en meer (plat getekend), geen 3D-camera nodig
+                    if (vliegcamera != null) vliegcamera.enabled = false;
+                    if (meer == null) meer = new WaterSim.Sim.Meer(24, 6, 12);
+                    Bouw();
+                    return;
+                }
+                if (info.scene == 1 || info.scene == 2)
                 {
                     // level 1 en 2: dichtbij om één of twee moleculen heen draaien
                     molecuul.soort = info.scene == 1 ? Molecuulscene.Soort.Molecuul : Molecuulscene.Soort.Paar;
@@ -1156,6 +1330,12 @@ namespace WaterSim.UI
                     formuleDicht.gameObject.SetActive(knopZichtbaar);
                 }
                 WerkFormuleBij();
+            }
+            if (MacroLevel)
+            {
+                foreach (var k in schakelaars) Actief(k.img, k.t, k.aan());
+                WerkMacroBij();
+                return;
             }
             if (MolecuulLevel || IjsLevel)
             {

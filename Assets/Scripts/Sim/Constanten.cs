@@ -20,6 +20,13 @@ namespace WaterSim.Sim
         public const double MolaireMassaWater = 18.015;     // g/mol
         public const double Avogadro = 6.02214076e23;       // 1/mol
 
+        // --- Dichtheid van andere vloeistoffen (g/cm³, Binas, bij ≈ 20 °C) ---
+        public const double DichtheidZeewater = 1.025;
+        public const double DichtheidEthanol = 0.789;
+
+        // --- Warmtegeleiding (Binas) ---
+        public const double WarmtegeleidingIjs = 2.2;       // W/(m·K), bij 0 °C
+
         // --- Warmte (Binas-waarden, afgerond) ---
         public const double Smeltwarmte = 334;              // J/g bij 0 °C
         public const double Verdampingswarmte = 2257;       // J/g bij 100 °C
