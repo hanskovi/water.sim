@@ -203,8 +203,7 @@ browser van een Quest draaien, in een paar uur werk. Zo test je bewegingsziekte 
 ### Wat er nog moet gebeuren (bijgewerkt 9 november 2026)
 
 **Fase 4 afmaken (app-schil)**
-1. **Simulatiescherm in glas-en-ijsstijl:** bovenbalk en onderpaneel als glas, oranje voor actieve
-   knoppen, temperatuurschuif blauw → wit → oranje. Kleine klus.
+1. ~~Simulatiescherm in glas-en-ijsstijl~~ — klaar (donker waterglas, oranje actieve knoppen).
 2. **Opdrachten (deel B):** eerst samen de inhoud vastleggen (per level × league: vraagsoort,
    tekst, antwoord, tip), daarna bouwen: tipbalk, antwoordvak/meerkeuze, check, sterren opslaan.
    De grootste stap van fase 4.
@@ -233,7 +232,8 @@ Doorlopend: de punten onder "Later afstemmen" (kalotten, details smelten).
 
 ### Later afstemmen (bewust uitgesteld)
 
-- **Kalotten:** beeld van dichtbij is nog rommelig; doorkijkbel (5 Å) is een eerste oplossing.
+- ~~Kalotten~~ — opgelost: berekende bollen (impostors), CPK-kleuren, donkere rand, Bondi-stralen.
+- **Telefoontest** van MSAA 4× en kalotten in het losse blok (snelheid).
 - **Details van het smelten en de vloeistof:** hoe het smeltfront eruitziet, hoe snel moleculen
   bewegen, wat er precies in beeld gebeurt bij de overgang ijs ↔ water.
 - **Eerste keer laden in de editor:** shaders compileren dan even (in een build niet).
