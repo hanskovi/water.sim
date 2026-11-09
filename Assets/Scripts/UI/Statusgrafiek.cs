@@ -99,9 +99,11 @@ namespace WaterSim.UI
     }
 
     /// <summary>
-    /// Kleine opwarmkromme: temperatuur tegen toegevoerde warmte (J/g), met het smeltplateau bij 0 °C, de huidige
+    /// Kleine opwarmkromme: temperatuur tegen toegevoerde warmte, met het smeltplateau bij 0 °C, de huidige
     /// toestand als stip en een pijl in de looprichting. Bij stollen gespiegeld: links hoog (water), rechts laag (ijs),
-    /// zodat je altijd van links naar rechts leest. Verhoudingen volgen Binas (c_ijs, c_water, smeltwarmte).
+    /// zodat je altijd van links naar rechts leest.
+    /// Schematisch (zoals in het schoolboek): de schuine takken van ijs en water zijn even steil en het plateau
+    /// heeft een vaste breedte; binnen elk stuk loopt de stip wel evenredig met de warmte.
     /// </summary>
     public class Opwarmkromme : MaskableGraphic
     {
@@ -132,10 +134,22 @@ namespace WaterSim.UI
             PlaatsLabels();
         }
 
+        const float PlateauDeel = 0.42f;        // deel van de breedte voor het plateau
+
+        // schematische x (0..1): de schuine stukken krijgen breedte evenredig met hun temperatuurverschil,
+        // zodat ijs en water even steil lopen
+        float X(float h)
+        {
+            float ijs = -tLaag, water = tHoog, k = (1f - PlateauDeel) / (ijs + water);
+            if (h <= 0f) return k * ijs * Mathf.InverseLerp(HL, 0f, h);
+            if (h <= L) return k * ijs + PlateauDeel * (h / L);
+            return k * ijs + PlateauDeel + k * water * Mathf.InverseLerp(L, HH, h);
+        }
+
         Vector2 P(Rect r, float h)
         {
             float t = (float)Fasemodel.TemperatuurBij(h);
-            float x = Mathf.InverseLerp(HL, HH, h);
+            float x = X(h);
             if (spiegel) x = 1f - x;
             float y = Mathf.InverseLerp(tLaag, tHoog, t);
             return new Vector2(r.xMin + Links + x * (r.width - Links - Rechts), r.yMin + Onder + y * (r.height - Onder - Boven));

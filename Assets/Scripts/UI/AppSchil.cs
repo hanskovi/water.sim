@@ -346,9 +346,12 @@ namespace WaterSim.UI
             var logo = Tekst(kop.transform, "Logo", "<b>Water.</b><size=72%>sim</size>", 27f, Color.white, TextAlignmentOptions.Left);
             LE(logo.gameObject, flexW: 1f);
             var taal = Glas(kop.transform, "Taal", 8f);
-            LE(taal.gameObject, prefW: 52f);
+            LE(taal.gameObject, prefW: 62f);
             var tt = Tekst(taal.transform, "Tekst", Teksten.T("taal"), 14f, Color.white, TextAlignmentOptions.Center);
-            Vul(tt.rectTransform);
+            Vul(tt.rectTransform, 0, 0, 16, 0);
+            // klein driehoekje: hier valt iets te kiezen
+            var taalPijl = Icoon(taal.transform, "Pijl", PijlOmlaag(), new Color(1f, 1f, 1f, 0.85f));
+            Hoek(taalPijl.rectTransform, new Vector2(1f, 0.5f), new Vector2(-9f, -1f), new Vector2(11f, 11f));
             Knop(taal, () => Teksten.Stel(Teksten.Huidig == Taal.NL ? Taal.EN : Taal.NL));
             var lijn = Vlak(startPagina, "Lijn", new Color(1f, 1f, 1f, 0.35f));
             LE(lijn.gameObject, prefH: 1f);
