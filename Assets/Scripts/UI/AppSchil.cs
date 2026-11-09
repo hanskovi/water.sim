@@ -163,7 +163,11 @@ namespace WaterSim.UI
             laatsteSafe = Screen.safeArea;
             laatsteScherm = new Vector2(Screen.width, Screen.height);
             if (veilig == null || Screen.width <= 0 || Screen.height <= 0) return;
-            schaler.matchWidthOrHeight = Screen.width > Screen.height ? 1f : 0f;
+            // Schalen op de breedte (smalle telefoons) of op de hoogte (tablets, liggend). Daartussen een vloeiende
+            // overgang, zodat toestellen rond de grens (vouwtelefoons) niet verspringen. Zo heeft elk scherm
+            // ongeveer de hoogte van een telefoon (844) en past de inhoud boven de golf.
+            float verhouding = (float)Screen.width / Screen.height;
+            schaler.matchWidthOrHeight = Mathf.InverseLerp(SchaalBreedteTot, SchaalHoogteVanaf, verhouding);
             Rect s = Screen.safeArea;
             veilig.anchorMin = new Vector2(s.xMin / Screen.width, s.yMin / Screen.height);
             veilig.anchorMax = new Vector2(s.xMax / Screen.width, s.yMax / Screen.height);
@@ -178,7 +182,10 @@ namespace WaterSim.UI
 
         // Kolombreedte op de echte (geschaalde) breedte van de veilige zone. Bij het opstarten heeft Unity het canvas
         // nog niet geschaald (dan meldt het pixels i.p.v. eenheden); daarom wordt dit elk beeld gecontroleerd.
-        const float MaxKolom = 440f, MinZij = 6f, Binnenmarge = 14f, TegelGat = 9f;
+        const float SchaalBreedteTot = 0.5f, SchaalHoogteVanaf = 0.62f;
+        // Op tablets wordt de kolom breder (max 580) zodat het lijkt op de telefoon; de tegels worden breder,
+        // maar niet hoger dan TegelMaxHoogte, anders past de inhoud niet meer boven de golf.
+        const float MaxKolom = 580f, MinZij = 6f, Binnenmarge = 14f, TegelGat = 9f, TegelMaxHoogte = 92f;
         float kolomBreedte = -1f;
         GridLayoutGroup levelRaster;
         void PasKolomAan()
@@ -187,21 +194,21 @@ namespace WaterSim.UI
             float w = veilig.rect.width;
             if (w <= 0f || Mathf.Abs(w - kolomBreedte) < 0.5f) return;
             kolomBreedte = w;
-            float zij = Mathf.Max(MinZij, (w - MaxKolom) / 2f);         // smal scherm: kleine marge; breed: kolom van 440
+            float zij = Mathf.Max(MinZij, (w - MaxKolom) / 2f);         // smal scherm: kleine marge; breed: kolom van 580
             kolom.offsetMin = new Vector2(zij, 0f);
             kolom.offsetMax = new Vector2(-zij, 0f);
             if (levelRaster != null)
             {
                 float binnen = w - 2f * zij - 2f * Binnenmarge;
-                float cel = Mathf.Min(110f, (binnen - 2f * TegelGat) / 3f);     // tegels schalen mee op smalle telefoons
-                levelRaster.cellSize = new Vector2(cel, cel * 84f / 110f);
+                float cel = (binnen - 2f * TegelGat) / 3f;                       // tegels vullen de breedte
+                levelRaster.cellSize = new Vector2(cel, Mathf.Min(cel * 84f / 110f, TegelMaxHoogte));
                 var le = levelRaster.GetComponent<LayoutElement>();
                 if (le != null) le.preferredHeight = 2f * levelRaster.cellSize.y + TegelGat;
             }
         }
 
-        // De golf ligt standaard op 30% van de schermhoogte. Op bredere schermen (iPad) is de inhoud naar verhouding
-        // hoger; dan zakt de golf tot net onder de puntenbalk, zodat hij niet door de knoppen loopt.
+        // Vangnet: de golf ligt op 30% van de schermhoogte. Is de inhoud toch te hoog (bv. lange tekst of een
+        // ongewoon scherm), dan zakt de golf tot net onder de puntenbalk, zodat hij niet door de knoppen loopt.
         const float GolfStandaard = 0.30f, GolfMinimum = 0.06f, GolfMarge = 22f;
         readonly System.Collections.Generic.List<IcoonAchtergrond> achtergrondLagen = new System.Collections.Generic.List<IcoonAchtergrond>();
         RectTransform voortgangRij;
