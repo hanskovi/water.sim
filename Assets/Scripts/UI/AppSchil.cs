@@ -166,13 +166,36 @@ namespace WaterSim.UI
             veilig.anchorMin = new Vector2(s.xMin / Screen.width, s.yMin / Screen.height);
             veilig.anchorMax = new Vector2(s.xMax / Screen.width, s.yMax / Screen.height);
             veilig.offsetMin = veilig.offsetMax = Vector2.zero;
-            // de inhoud blijft een smalle kolom (zoals op een telefoon), ook op een liggend scherm
-            kolom.anchorMin = new Vector2(0.5f, 0f);
-            kolom.anchorMax = new Vector2(0.5f, 1f);
+            // de kolom vult de veilige zone; de breedte wordt in PasKolomAan op de echte, geschaalde maat gezet
+            kolom.anchorMin = Vector2.zero;
+            kolom.anchorMax = Vector2.one;
             kolom.pivot = new Vector2(0.5f, 0.5f);
-            float breedte = ((RectTransform)canvas.transform).rect.width * (s.width / Screen.width);
-            kolom.sizeDelta = new Vector2(Mathf.Min(breedte, 440f), 0f);
-            kolom.anchoredPosition = Vector2.zero;
+            kolomBreedte = -1f;
+            PasKolomAan();
+        }
+
+        // Kolombreedte op de echte (geschaalde) breedte van de veilige zone. Bij het opstarten heeft Unity het canvas
+        // nog niet geschaald (dan meldt het pixels i.p.v. eenheden); daarom wordt dit elk beeld gecontroleerd.
+        const float MaxKolom = 440f, MinZij = 6f, Binnenmarge = 14f, TegelGat = 9f;
+        float kolomBreedte = -1f;
+        GridLayoutGroup levelRaster;
+        void PasKolomAan()
+        {
+            if (veilig == null || kolom == null) return;
+            float w = veilig.rect.width;
+            if (w <= 0f || Mathf.Abs(w - kolomBreedte) < 0.5f) return;
+            kolomBreedte = w;
+            float zij = Mathf.Max(MinZij, (w - MaxKolom) / 2f);         // smal scherm: kleine marge; breed: kolom van 440
+            kolom.offsetMin = new Vector2(zij, 0f);
+            kolom.offsetMax = new Vector2(-zij, 0f);
+            if (levelRaster != null)
+            {
+                float binnen = w - 2f * zij - 2f * Binnenmarge;
+                float cel = Mathf.Min(110f, (binnen - 2f * TegelGat) / 3f);     // tegels schalen mee op smalle telefoons
+                levelRaster.cellSize = new Vector2(cel, cel * 84f / 110f);
+                var le = levelRaster.GetComponent<LayoutElement>();
+                if (le != null) le.preferredHeight = 2f * levelRaster.cellSize.y + TegelGat;
+            }
         }
 
         VerticalLayoutGroup Kolom(RectTransform rt, int marge, float tussen)
@@ -295,6 +318,7 @@ namespace WaterSim.UI
             // levels: 3 × 2 tegels
             var raster = Maak("Levels", startPagina);
             var g = raster.gameObject.AddComponent<GridLayoutGroup>();
+            levelRaster = g;
             g.cellSize = new Vector2(110f, 84f);
             g.spacing = new Vector2(9f, 9f);
             g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
@@ -611,6 +635,7 @@ namespace WaterSim.UI
         void Update()
         {
             if (Screen.safeArea != laatsteSafe || Screen.width != (int)laatsteScherm.x || Screen.height != (int)laatsteScherm.y) PasSchermAan();
+            PasKolomAan();
             if (kristal == null || kristal.Model == null) return;
 
             if (pagina == Pagina.Start)
