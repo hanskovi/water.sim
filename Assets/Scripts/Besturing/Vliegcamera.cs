@@ -4,10 +4,13 @@ using UnityEngine.InputSystem;
 namespace WaterSim.Besturing
 {
     /// <summary>
-    /// Vrij vliegen door het kristal.
-    /// - Muis: slepen = rondkijken, scrollen = vooruit/achteruit.
-    /// - Toetsen: W/S of ↑/↓ vooruit/achteruit, A/D of ←/→ opzij, Q/E omlaag/omhoog, Shift = sneller.
-    /// - Aanraken: één vinger slepen = rondkijken, twee vingers omhoog/omlaag schuiven = vooruit/achteruit.
+    /// Twee standen:
+    /// - Vrij vliegen door het kristal (oneindig).
+    ///   Muis: slepen = rondkijken, scrollen = vooruit/achteruit. Toetsen: W/S of ↑/↓ vooruit/achteruit,
+    ///   A/D of ←/→ opzij, Q/E omlaag/omhoog, Shift = sneller. Aanraken: één vinger = rondkijken,
+    ///   twee vingers omhoog/omlaag = vooruit/achteruit.
+    /// - Draaien om een punt (los blok, <see cref="DraaiOm"/>): slepen = om het blok heen draaien,
+    ///   scrollen / twee vingers / W en S = dichterbij of verder weg, A/D en Q/E = draaien.
     /// Afstanden in Å.
     /// </summary>
     public class Vliegcamera : MonoBehaviour
@@ -25,8 +28,26 @@ namespace WaterSim.Besturing
         /// aanrakingen die daar beginnen, sturen de camera niet.</summary>
         public static System.Predicate<Vector2> OpUI;
 
-        float yaw, pitch;
-        bool muisOpUI;
+        [Header("Draaien om een punt")]
+        public Vector3 draaiPunt = Vector3.zero;
+        public float minAfstand = 10f, maxAfstand = 160f;
+        [Tooltip("Graden per seconde bij A/D en Q/E.")]
+        public float draaiToets = 70f;
+
+        float yaw, pitch, afstand = 60f;
+        bool muisOpUI, draaiOm;
+
+        /// <summary>Aan: de camera draait om <see cref="draaiPunt"/> (los blok). Uit: vrij vliegen.</summary>
+        public bool DraaiOm
+        {
+            get => draaiOm;
+            set
+            {
+                if (value == draaiOm) return;
+                draaiOm = value;
+                if (draaiOm) Zet(transform.position, draaiPunt);
+            }
+        }
 
         /// <summary>Zet de camera op <paramref name="positie"/>, kijkend naar <paramref name="kijkNaar"/>.</summary>
         public void Zet(Vector3 positie, Vector3 kijkNaar)
@@ -36,6 +57,7 @@ namespace WaterSim.Besturing
             yaw = r.y;
             pitch = r.x > 180f ? r.x - 360f : r.x;
             transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+            if (draaiOm) afstand = Mathf.Clamp(Vector3.Distance(positie, draaiPunt), minAfstand, maxAfstand);
         }
 
         void Start()
@@ -91,6 +113,16 @@ namespace WaterSim.Besturing
                 if (tb.qKey.isPressed) beweeg.y -= v;
             }
 
+            if (draaiOm)
+            {
+                // slepen pakt het blok vast: naar rechts slepen draait het blok naar rechts
+                yaw += -kijk.x * kijkGevoeligheid + Mathf.Sign(beweeg.x) * (beweeg.x != 0f ? draaiToets * dt : 0f);
+                pitch = Mathf.Clamp(pitch - kijk.y * kijkGevoeligheid + Mathf.Sign(beweeg.y) * (beweeg.y != 0f ? draaiToets * dt : 0f), -85f, 85f);
+                afstand = Mathf.Clamp(afstand * Mathf.Exp(-beweeg.z * 0.08f), minAfstand, maxAfstand);
+                transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+                transform.position = draaiPunt - transform.forward * afstand;
+                return;
+            }
             yaw += kijk.x * kijkGevoeligheid;
             pitch = Mathf.Clamp(pitch - kijk.y * kijkGevoeligheid, -85f, 85f);
             transform.rotation = Quaternion.Euler(pitch, yaw, 0f);

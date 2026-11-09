@@ -638,6 +638,7 @@ namespace WaterSim.UI
                 kristal.Herstart(info.startT, info.oneindig);
                 if (vliegcamera != null)
                 {
+                    vliegcamera.DraaiOm = !info.oneindig;
                     if (info.oneindig) vliegcamera.Zet(Vector3.zero, new Vector3(0f, 0f, 1f));
                     else vliegcamera.Zet(kristal.BlokKijkpunt, Vector3.zero);
                     vliegcamera.enabled = true;
@@ -660,11 +661,13 @@ namespace WaterSim.UI
                 kalottenTerugPos = cam.position; kalottenTerugKijk = cam.position + cam.forward;
                 kalottenZetteBlok = kristal.oneindig;
                 if (kristal.oneindig) kristal.oneindig = false;
+                vliegcamera.DraaiOm = true;
                 vliegcamera.Zet(kristal.BlokKijkpunt, Vector3.zero);
             }
             else if (kalottenZetteBlok)
             {
                 kristal.oneindig = true;
+                vliegcamera.DraaiOm = false;
                 vliegcamera.Zet(kalottenTerugPos, kalottenTerugKijk);
                 kalottenZetteBlok = false;
             }
@@ -674,6 +677,7 @@ namespace WaterSim.UI
         {
             kristal.oneindig = !kristal.oneindig;
             if (vliegcamera == null) return;
+            vliegcamera.DraaiOm = !kristal.oneindig;
             if (kristal.oneindig) vliegcamera.Zet(Vector3.zero, new Vector3(0, 0, 1));
             else vliegcamera.Zet(kristal.BlokKijkpunt, Vector3.zero);
         }
