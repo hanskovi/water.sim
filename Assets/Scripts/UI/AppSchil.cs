@@ -134,6 +134,7 @@ namespace WaterSim.UI
             // achtergrond in de stijl van het icoon: water (lagune + golf), ijsrooster, schuim en stoom
             startAchtergrond = Maak("Achtergrond", go.transform);
             Vul(startAchtergrond);
+            achtergrondLagen.Clear();
             foreach (IcoonAchtergrond.Laag l in System.Enum.GetValues(typeof(IcoonAchtergrond.Laag)))
             {
                 // CanvasRenderer eerst zelf toevoegen: Unity doet dat hier niet vanzelf, en zonder tekent het vlak niets
@@ -142,6 +143,7 @@ namespace WaterSim.UI
                 var laag = go2.AddComponent<IcoonAchtergrond>();
                 laag.laag = l;
                 Vul(laag.rectTransform);
+                achtergrondLagen.Add(laag);
             }
 
             veilig = Maak("VeiligeZone", go.transform);
@@ -195,6 +197,29 @@ namespace WaterSim.UI
                 levelRaster.cellSize = new Vector2(cel, cel * 84f / 110f);
                 var le = levelRaster.GetComponent<LayoutElement>();
                 if (le != null) le.preferredHeight = 2f * levelRaster.cellSize.y + TegelGat;
+            }
+        }
+
+        // De golf ligt standaard op 30% van de schermhoogte. Op bredere schermen (iPad) is de inhoud naar verhouding
+        // hoger; dan zakt de golf tot net onder de puntenbalk, zodat hij niet door de knoppen loopt.
+        const float GolfStandaard = 0.30f, GolfMinimum = 0.06f, GolfMarge = 22f;
+        readonly System.Collections.Generic.List<IcoonAchtergrond> achtergrondLagen = new System.Collections.Generic.List<IcoonAchtergrond>();
+        RectTransform voortgangRij;
+        readonly Vector3[] hoeken = new Vector3[4];
+        void PasGolfAan()
+        {
+            if (voortgangRij == null || startAchtergrond == null || achtergrondLagen.Count == 0) return;
+            Rect r = startAchtergrond.rect;
+            if (r.height <= 0f) return;
+            voortgangRij.GetWorldCorners(hoeken);
+            float onder = startAchtergrond.InverseTransformPoint(hoeken[0]).y;       // onderkant van de puntenbalk
+            float uitslag = achtergrondLagen[0].golfUitslag;
+            float h = Mathf.Clamp((onder - r.yMin - uitslag - GolfMarge) / r.height, GolfMinimum, GolfStandaard);
+            foreach (var l in achtergrondLagen)
+            {
+                if (Mathf.Abs(l.golfHoogte - h) < 0.001f) continue;
+                l.golfHoogte = h;
+                l.SetVerticesDirty();
             }
         }
 
@@ -407,6 +432,7 @@ namespace WaterSim.UI
         {
             int sterren = PlayerPrefs.GetInt("watersim.sterren", 0);
             var rij = Rij(ouder, "Voortgang", 16f, 8f);
+            voortgangRij = (RectTransform)rij.transform;
             var houder = Maak("Balkhouder", rij.transform);
             LE(houder.gameObject, flexW: 1f);
             var balk = Glas(houder, "Balk", 6f, 0.18f);
@@ -636,6 +662,7 @@ namespace WaterSim.UI
         {
             if (Screen.safeArea != laatsteSafe || Screen.width != (int)laatsteScherm.x || Screen.height != (int)laatsteScherm.y) PasSchermAan();
             PasKolomAan();
+            if (pagina == Pagina.Start) PasGolfAan();
             if (kristal == null || kristal.Model == null) return;
 
             if (pagina == Pagina.Start)
