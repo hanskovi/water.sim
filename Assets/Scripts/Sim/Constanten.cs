@@ -29,6 +29,9 @@ namespace WaterSim.Sim
         /// <summary>Volume van de rechthoekige ijscel (a × a√3 × c) in Å³.</summary>
         public static double CelvolumeIjs => IjsA * IjsA * System.Math.Sqrt(3) * IjsC;
 
+        /// <summary>Dichtheid van ijs Ih bij 0 °C volgens Binas (g/cm³). Het rooster geeft ≈ 0,919 (bij −10 °C).</summary>
+        public const double DichtheidIjsBinas = 0.917;
+
         /// <summary>Dichtheid van ijs Ih, berekend uit het rooster (≈ 0,92 g/cm³).</summary>
         public static double DichtheidIjs =>
             MoleculenPerRechthoekigeCel * MolaireMassaWater / (Avogadro * CelvolumeIjs * 1e-24);

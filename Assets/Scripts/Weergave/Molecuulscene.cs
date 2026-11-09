@@ -10,6 +10,7 @@ namespace WaterSim.Weergave
     /// Kleine scènes voor level 1 en 2: één watermolecuul (hoek, δ+ en δ−) of twee moleculen met een waterstofbrug.
     /// Gebruikt de meshes en materialen van <see cref="Kristal"/>, zodat alles er hetzelfde uitziet.
     /// Afstanden en hoeken op schaal (Å, Binas); bij bol-staaf zijn de atomen verkleind, zoals in het kristal.
+    /// De labels (δ+, δ−, de hoek) liggen in een plat vlak bovenop het beeld: ze verdwijnen nooit achter een atoom.
     /// </summary>
     public class Molecuulscene : MonoBehaviour
     {
@@ -22,14 +23,20 @@ namespace WaterSim.Weergave
         public bool toonLadingen = true;
         public bool beweging = true;
 
+        /// <summary>Straal (Å) van een bol om het origin waar alles in past, ook de labels. Voor het kiezen van de camera-afstand.</summary>
+        public float Straal { get; private set; } = 2f;
+
         static readonly float OH = (float)Constanten.AfstandOH, OO = (float)Constanten.AfstandOO;
         static readonly float HalveHoek = (float)Constanten.HoekHOH * 0.5f * Mathf.Deg2Rad;
+        static readonly Color DeltaMin = new Color(1f, 0.66f, 0.6f), DeltaPlus = new Color(0.78f, 0.92f, 1f);
 
         readonly List<Matrix4x4> mO = new List<Matrix4x4>(), mH = new List<Matrix4x4>(), mS = new List<Matrix4x4>();
         readonly List<Matrix4x4> mB = new List<Matrix4x4>(), mBK = new List<Matrix4x4>(), mBoog = new List<Matrix4x4>();
-        readonly List<TextMeshPro> labels = new List<TextMeshPro>();
-        Material brugMat, kernMat;
+        readonly List<TextMeshProUGUI> labels = new List<TextMeshProUGUI>();
+        Material brugMat, kernMat, vlakMat, randMat;
         Color brugKleur, kernKleur;
+        Mesh hoekvlak;
+        Canvas labelDoek;
         Camera cam;
 
         // één molecuul: O en de twee H-atomen
@@ -44,18 +51,33 @@ namespace WaterSim.Weergave
                 kernMat = new Material(bron.brug) { name = "Brugkern (molecuul)" };
                 brugKleur = bron.brug.GetColor("_BaseColor");
                 kernKleur = bron.kernKleur;
+                // hoek: licht, doorzichtig vlakje met een heldere rand (geen HDR, dus geen gloed)
+                vlakMat = new Material(bron.brug) { name = "Hoekvlak" };
+                vlakMat.SetColor("_BaseColor", new Color(0.85f, 0.93f, 1f, 0.22f));
+                randMat = new Material(bron.brug) { name = "Hoekrand" };
+                randMat.SetColor("_BaseColor", new Color(0.9f, 0.96f, 1f, 0.9f));
             }
+            if (hoekvlak == null) hoekvlak = new Mesh { name = "Hoekvlak" };
+            if (labelDoek == null)
+            {
+                var go = new GameObject("Labels", typeof(RectTransform), typeof(Canvas));
+                go.transform.SetParent(transform, false);
+                labelDoek = go.GetComponent<Canvas>();
+                labelDoek.renderMode = RenderMode.ScreenSpaceOverlay;
+                labelDoek.sortingOrder = 50;                 // boven het 3D-beeld, onder de knoppen
+            }
+            labelDoek.gameObject.SetActive(true);
         }
 
         void OnDisable()
         {
-            foreach (var l in labels) if (l != null) l.gameObject.SetActive(false);
+            if (labelDoek != null) labelDoek.gameObject.SetActive(false);
         }
 
         void OnDestroy()
         {
-            if (brugMat != null) Destroy(brugMat);
-            if (kernMat != null) Destroy(kernMat);
+            foreach (var m in new[] { brugMat, kernMat, vlakMat, randMat }) if (m != null) Destroy(m);
+            if (hoekvlak != null) Destroy(hoekvlak);
         }
 
         void LateUpdate()
@@ -68,8 +90,10 @@ namespace WaterSim.Weergave
 
             float t = Time.time;
             float w = beweging ? 1f : 0f;
+            float rO = kalotten ? 1.52f * bron.kalottenSchaal : 0.36f, rH = kalotten ? 1.20f * bron.kalottenSchaal : 0.20f;
             mO.Clear(); mH.Clear(); mS.Clear(); mB.Clear(); mBK.Clear(); mBoog.Clear();
             int lab = 0;
+            bool toonHoek = false;
 
             if (soort == Soort.Molecuul)
             {
@@ -77,16 +101,14 @@ namespace WaterSim.Weergave
                 var draai = Quaternion.Euler(4f * w * Mathf.Sin(t * 0.7f), 8f * w * Mathf.Sin(t * 0.45f), 3f * w * Mathf.Sin(t * 0.9f));
                 var m = Maak(Vector3.zero, draai * Vector3.down, draai * Vector3.right, 1f + 0.015f * w * Mathf.Sin(t * 6f));
                 Teken(m);
-                Hoekboog(m);
-                if (toonLadingen)
+                if (!kalotten)
                 {
+                    toonHoek = true;
+                    Hoek(m);
                     var bis = ((m.h1 + m.h2) * 0.5f - m.o).normalized;
-                    Label(ref lab, m.o - bis * (kalotten ? 1.75f : 0.75f), "δ−", new Color(1f, 0.62f, 0.55f));
-                    Label(ref lab, m.h1 + (m.h1 - m.o).normalized * (kalotten ? 1.25f : 0.45f), "δ+", new Color(0.75f, 0.9f, 1f));
-                    Label(ref lab, m.h2 + (m.h2 - m.o).normalized * (kalotten ? 1.25f : 0.45f), "δ+", new Color(0.75f, 0.9f, 1f));
+                    Label(ref lab, m.o + bis * (OH + 0.45f), Hoektekst(), Color.white, 14f);
                 }
-                Label(ref lab, m.o + ((m.h1 + m.h2) * 0.5f - m.o).normalized * (kalotten ? 1.9f : 0.95f),
-                      Hoektekst(), new Color(1f, 1f, 1f, 0.9f), 2.6f, !kalotten);
+                if (toonLadingen) Ladingen(ref lab, m, rO, rH);
             }
             else
             {
@@ -104,20 +126,17 @@ namespace WaterSim.Weergave
                 var b = Maak(oB, bisH, draaiB * Vector3.up, 1f);
                 Teken(a); Teken(b);
                 bron.Brug(a.h1, b.o, mB, mBK);
-                if (toonLadingen)
-                {
-                    Label(ref lab, a.o + new Vector3(-0.35f, -0.65f, 0f) * (kalotten ? 2.2f : 1f), "δ−", new Color(1f, 0.62f, 0.55f));
-                    Label(ref lab, a.h1 + Vector3.up * (kalotten ? 1.25f : 0.42f), "δ+", new Color(0.75f, 0.9f, 1f));
-                    Label(ref lab, a.h2 + (a.h2 - a.o).normalized * (kalotten ? 1.25f : 0.42f), "δ+", new Color(0.75f, 0.9f, 1f));
-                    Label(ref lab, b.o + new Vector3(-0.1f, -0.75f, 0f) * (kalotten ? 2.2f : 1f), "δ−", new Color(1f, 0.62f, 0.55f));
-                    Label(ref lab, b.h1 + (b.h1 - b.o).normalized * (kalotten ? 1.25f : 0.42f), "δ+", new Color(0.75f, 0.9f, 1f));
-                    Label(ref lab, b.h2 + (b.h2 - b.o).normalized * (kalotten ? 1.25f : 0.42f), "δ+", new Color(0.75f, 0.9f, 1f));
-                }
+                if (toonLadingen) { Ladingen(ref lab, a, rO, rH); Ladingen(ref lab, b, rO, rH); }
             }
             for (int i = lab; i < labels.Count; i++) labels[i].gameObject.SetActive(false);
 
+            // straal van alles wat in beeld moet (atomen + ruimte voor de labels)
+            float straal = 0f;
+            foreach (var m in mO) straal = Mathf.Max(straal, ((Vector3)m.GetColumn(3)).magnitude + rO);
+            foreach (var m in mH) straal = Mathf.Max(straal, ((Vector3)m.GetColumn(3)).magnitude + rH);
+            Straal = straal + 0.45f;
+
             // tekenen
-            float rO = kalotten ? 1.52f * bron.kalottenSchaal : 0.36f, rH = kalotten ? 1.20f * bron.kalottenSchaal : 0.20f;
             Schaal(mO, rO); Schaal(mH, rH);
             if (kalotten && bron.zuurstofGlad != null && bron.waterstofGlad != null)
             {
@@ -129,7 +148,6 @@ namespace WaterSim.Weergave
                 Teken(bron.bol, bron.zuurstof, mO);
                 Teken(bron.bol, bron.waterstof, mH);
                 Teken(bron.cilinder, bron.staaf, mS);
-                Teken(bron.cilinder, bron.staaf, mBoog);
                 if (brugMat != null)
                 {
                     float f = bron.pulseren ? 1f + bron.pulsSterkte * Mathf.Sin(t * bron.pulsSnelheid) : 1f;
@@ -139,7 +157,21 @@ namespace WaterSim.Weergave
                     Teken(mesh, brugMat, mB);
                     Teken(mesh, kernMat, mBK);
                 }
+                if (toonHoek && vlakMat != null)
+                {
+                    Graphics.RenderMesh(new RenderParams(vlakMat) { shadowCastingMode = ShadowCastingMode.Off }, hoekvlak, 0, Matrix4x4.identity);
+                    Teken(bron.cilinder, randMat, mBoog);
+                }
             }
+        }
+
+        // δ− naast de O (van de H-atomen af), δ+ voorbij elk H-atoom
+        void Ladingen(ref int lab, Mol m, float rO, float rH)
+        {
+            var weg = -((m.h1 - m.o).normalized + (m.h2 - m.o).normalized).normalized;
+            Label(ref lab, m.o + weg * (rO + 0.3f), "δ−", DeltaMin, 17f);
+            Label(ref lab, m.h1 + (m.h1 - m.o).normalized * (rH + 0.28f), "δ+", DeltaPlus, 17f);
+            Label(ref lab, m.h2 + (m.h2 - m.o).normalized * (rH + 0.28f), "δ+", DeltaPlus, 17f);
         }
 
         // molecuul met O op o; de H-atomen liggen rond 'bisectrice' in het vlak met 'inVlak'
@@ -170,19 +202,20 @@ namespace WaterSim.Weergave
             }
         }
 
-        // boogje tussen de twee O–H-bindingen, om de hoek te laten zien (alleen bij bol-staaf)
-        void Hoekboog(Mol m)
+        // taartpunt tussen de twee O–H-bindingen (dubbelzijdig) met een heldere boogrand, zoals in het schoolboek
+        void Hoek(Mol m)
         {
-            if (kalotten) return;
             var a = (m.h1 - m.o).normalized; var b = (m.h2 - m.o).normalized;
-            const int stukken = 14; const float straal = 0.55f;
-            var vorige = m.o + a * straal;
-            for (int k = 1; k <= stukken; k++)
-            {
-                var p = m.o + Vector3.Slerp(a, b, k / (float)stukken) * straal;
-                mBoog.Add(Staaf(vorige, p, 0.012f));
-                vorige = p;
-            }
+            const int stukken = 20; const float straal = 0.62f;
+            var v = new List<Vector3> { m.o };
+            for (int k = 0; k <= stukken; k++) v.Add(m.o + Vector3.Slerp(a, b, k / (float)stukken) * straal);
+            var d = new List<int>();
+            for (int k = 1; k <= stukken; k++) { d.Add(0); d.Add(k); d.Add(k + 1); d.Add(0); d.Add(k + 1); d.Add(k); }
+            hoekvlak.Clear();
+            hoekvlak.SetVertices(v);
+            hoekvlak.SetTriangles(d, 0);
+            hoekvlak.RecalculateBounds();
+            for (int k = 1; k <= stukken; k++) mBoog.Add(Staaf(v[k], v[k + 1], 0.022f));
         }
 
         static string Hoektekst() => ((float)Constanten.HoekHOH).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
@@ -209,26 +242,31 @@ namespace WaterSim.Weergave
             Graphics.RenderMeshInstanced(rp, mesh, 0, lijst);
         }
 
-        // tekstje in de ruimte dat altijd naar de camera kijkt
-        void Label(ref int nr, Vector3 p, string tekst, Color kleur, float grootte = 3.2f, bool zichtbaar = true)
+        // label in het platte vlak bovenop het beeld, op de plek waar dit punt in beeld staat
+        void Label(ref int nr, Vector3 p, string tekst, Color kleur, float grootte)
         {
-            if (!zichtbaar) return;
+            var s = cam.WorldToScreenPoint(p);
+            if (s.z <= 0f) return;
             if (nr >= labels.Count)
             {
                 var go = new GameObject("Label", typeof(RectTransform));
-                go.transform.SetParent(transform, false);
-                var t = go.AddComponent<TextMeshPro>();
-                if (font != null) t.font = font;
-                t.alignment = TextAlignmentOptions.Center;
-                t.textWrappingMode = TextWrappingModes.NoWrap;
-                t.rectTransform.sizeDelta = new Vector2(2f, 0.6f);
-                labels.Add(t);
+                go.transform.SetParent(labelDoek.transform, false);
+                var l = go.AddComponent<TextMeshProUGUI>();
+                if (font != null) l.font = font;
+                l.alignment = TextAlignmentOptions.Center;
+                l.textWrappingMode = TextWrappingModes.NoWrap;
+                l.raycastTarget = false;
+                l.fontStyle = FontStyles.Bold;
+                l.outlineWidth = 0.22f;
+                l.outlineColor = new Color32(6, 20, 32, 220);
+                l.rectTransform.sizeDelta = new Vector2(200f, 60f);
+                labels.Add(l);
             }
-            var l = labels[nr++];
-            l.gameObject.SetActive(true);
-            l.text = tekst; l.color = kleur; l.fontSize = grootte;
-            l.transform.position = p;
-            l.transform.rotation = cam.transform.rotation;
+            var t = labels[nr++];
+            t.gameObject.SetActive(true);
+            t.text = tekst; t.color = kleur;
+            t.fontSize = grootte * Mathf.Min(Screen.width / 390f, Screen.height / 844f);   // zelfde maat als de rest van de interface
+            t.rectTransform.position = new Vector3(s.x, s.y, 0f);
         }
     }
 }

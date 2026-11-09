@@ -42,7 +42,7 @@ namespace WaterSim.Sim
         /// <summary>Gemiddeld aantal H-bruggen per molecuul (binnenin gemeten, uitgevlakt).</summary>
         public float BruggenPerMolecuul { get; private set; } = 4f;
         /// <summary>Dichtheid in g/cm³ van het mengsel ijs + water.</summary>
-        public double Dichtheid => 0.917 + Fase.Gesmolten * (Constanten.DichtheidWater(Math.Max(0, Fase.Temperatuur)) - 0.917);
+        public double Dichtheid => Constanten.DichtheidIjsBinas + Fase.Gesmolten * (Constanten.DichtheidWater(Math.Max(0, Fase.Temperatuur)) - Constanten.DichtheidIjsBinas);
 
         // ---------- afstelling ----------
         public float Draairuis = 0.20f, Uitlijnen = 8f, BrugCos = 0.80f, BrugAfstand = 3.5f, Veer = 6f, HeetSchaal = 70f;
@@ -152,7 +152,7 @@ namespace WaterSim.Sim
                 else if (!moet && Vloeibaar[i]) { Vloeibaar[i] = false; terug[i] = 0f; }
             }
             float rhoW = (float)Constanten.DichtheidWater(Math.Max(0, T));
-            Bovenkant = Oneindig ? Ly / 2 : -Ly / 2 + Ly * (1f - (float)Fase.Gesmolten * (1f - 0.917f / rhoW));
+            Bovenkant = Oneindig ? Ly / 2 : -Ly / 2 + Ly * (1f - (float)Fase.Gesmolten * (1f - (float)Constanten.DichtheidIjsBinas / rhoW));
 
             if (nVloeibaar > 0) Vloeistof(bewegingsDt, T);
             IJs(dt, bewegingsDt, T);

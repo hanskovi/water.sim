@@ -54,13 +54,13 @@ namespace WaterSim.UI
         {
             public bool speelbaar, oneindig;
             public float startT;
-            public int scene;                // 0 = kristal, 1 = één molecuul, 2 = twee moleculen met H-brug
+            public int scene;                // 0 = kristal met temperatuur, 1 = één molecuul, 2 = twee moleculen met H-brug, 3 = ijsstructuur
             public LevelInfo(bool s, bool o = true, float t = -10f, int sc = 0) { speelbaar = s; oneindig = o; startT = t; scene = sc; }
         }
         static readonly LevelInfo[] Levels =
         {
             new LevelInfo(true, sc: 1), new LevelInfo(true, sc: 2),
-            new LevelInfo(true, true, -10f), new LevelInfo(true, true, -10f), new LevelInfo(true, false, -10f),
+            new LevelInfo(true, true, -10f, 3), new LevelInfo(true, true, -10f), new LevelInfo(true, false, -10f),
             new LevelInfo(false),
         };
         static readonly int[] Snelknoppen = { -20, -5, 4, 20, 80 };   // 4 °C: water heeft dan de grootste dichtheid
@@ -78,7 +78,11 @@ namespace WaterSim.UI
         int level, league;
 
         Molecuulscene molecuul;
-        bool MolecuulLevel => Levels[level].scene != 0;
+        bool MolecuulLevel => Levels[level].scene == 1 || Levels[level].scene == 2;
+        bool IjsLevel => Levels[level].scene == 3;
+        RectTransform vrijRt;
+        int pasCameraAan;              // over zoveel beelden de camera-afstand aanpassen aan het molecuul
+        bool laatsteKalotten;
         Canvas canvas;
         CanvasScaler schaler;
         RectTransform veilig, kolom, startPagina, simPagina;
@@ -514,8 +518,50 @@ namespace WaterSim.UI
             // vrije ruimte in het midden: daar kijk en vlieg je rond
             var vrij = Maak("Vrij", simPagina);
             LE(vrij.gameObject, flexH: 1f);
+            vrijRt = vrij;
+            Zoomknoppen(vrij);
             if (MolecuulLevel) { BouwMolecuulpaneel(); return; }
+            if (IjsLevel) { BouwIjspaneel(); return; }
             BouwKristalpaneel();
+        }
+
+        // + en − rechts in beeld: dichterbij / verder weg (ook in de editor, waar knijpen niet kan)
+        void Zoomknoppen(RectTransform vrij)
+        {
+            var houder = Maak("Zoom", vrij);
+            Hoek(houder, new Vector2(1f, 0.5f), Vector2.zero, new Vector2(42f, 92f));
+            for (int i = 0; i < 2; i++)
+            {
+                int richting = i == 0 ? 1 : -1;
+                var k = Waterglas(houder, i == 0 ? "Plus" : "Min", 10f);
+                Hoek(k.rectTransform, new Vector2(0.5f, i == 0 ? 1f : 0f), Vector2.zero, new Vector2(42f, 42f));
+                var t = Tekst(k.transform, "Teken", i == 0 ? "+" : "−", 24f, Color.white, TextAlignmentOptions.Center, true);
+                Vul(t.rectTransform, 0, 2, 0, 0);
+                Knop(k, () => { if (vliegcamera != null) vliegcamera.Zoom(richting); });
+            }
+        }
+
+        // level 3: alleen de structuur van ijs, zonder temperatuur
+        void BouwIjspaneel()
+        {
+            var paneel = Waterglas(simPagina, "Bediening", 14f);
+            var pv = Kolom((RectTransform)paneel.transform, 12, 8);
+            pv.childAlignment = TextAnchor.LowerCenter;
+            string G(double v, string f) => Teksten.Getal(v, f);
+            Tekst(paneel.transform, "Feiten", string.Format(Teksten.T("level.3.feiten"), G(WaterSim.Sim.Constanten.AfstandOO, "0.00"),
+                  G(WaterSim.Sim.Constanten.HoekTetraeder, "0.0"), G(WaterSim.Sim.Constanten.DichtheidIjsBinas, "0.000")),
+                  13.5f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            var r = Rij(paneel.transform, "Weergave", 34f, 6f);
+            var kal = Pilknop(r.transform, Teksten.T("kalotten"), WisselKalotten);
+            schakelaars.Add((kal.img, kal.t, () => kristal.kalotten));
+            var hb = Pilknop(r.transform, Teksten.T("hbruggen"), () => kristal.toonBruggen = !kristal.toonBruggen);
+            schakelaars.Add((hb.img, hb.t, () => kristal.toonBruggen));
+            var kn = Pilknop(r.transform, Teksten.T("kanalen"), () => kristal.markeerKanaal = !kristal.markeerKanaal);
+            schakelaars.Add((kn.img, kn.t, () => kristal.markeerKanaal));
+            var bw = Pilknop(r.transform, Teksten.T("beweging"), () => kristal.beweging = !kristal.beweging);
+            schakelaars.Add((bw.img, bw.t, () => kristal.beweging));
+            var noot = Tekst(paneel.transform, "Model", Teksten.T("model.ijs"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
+            LE(noot.gameObject, prefH: 28f);
         }
 
         void Sterpil(Transform balk)
@@ -742,6 +788,8 @@ namespace WaterSim.UI
                 {
                     // level 1 en 2: dichtbij om één of twee moleculen heen draaien
                     molecuul.soort = info.scene == 1 ? Molecuulscene.Soort.Molecuul : Molecuulscene.Soort.Paar;
+                    laatsteKalotten = molecuul.kalotten;
+                    pasCameraAan = 3;               // na de opbouw van het scherm: passend inzoomen
                     if (vliegcamera != null)
                     {
                         vliegcamera.minAfstand = 2.5f; vliegcamera.maxAfstand = 25f;
@@ -814,9 +862,15 @@ namespace WaterSim.UI
                 if (nevel != null) nevel.color = new Color(1f, 1f, 1f, 0.27f + 0.05f * Mathf.Sin(Time.unscaledTime * 0.35f));
                 return;
             }
-            if (MolecuulLevel)
+            if (vliegcamera != null && vliegcamera.DraaiOm) PasMolecuulcamera(false);
+            if (MolecuulLevel || IjsLevel)
             {
                 foreach (var k in schakelaars) Actief(k.img, k.t, k.aan());
+                if (MolecuulLevel)
+                {
+                    if (molecuul.kalotten != laatsteKalotten) { laatsteKalotten = molecuul.kalotten; pasCameraAan = 2; }
+                    if (pasCameraAan > 0 && --pasCameraAan == 0) PasMolecuulcamera(true);
+                }
                 return;
             }
 
@@ -881,6 +935,24 @@ namespace WaterSim.UI
         }
 
         int statusRichting; bool statusPlateau;
+        readonly Vector3[] vrijHoeken = new Vector3[4];
+
+        // het draaipunt midden in het vrije stuk tussen bovenbalk en paneel; met 'afstand' ook passend inzoomen
+        void PasMolecuulcamera(bool afstand)
+        {
+            if (vliegcamera == null || vrijRt == null) return;
+            vrijRt.GetWorldCorners(vrijHoeken);            // overlay-canvas: wereld = schermpixels
+            float onder = vrijHoeken[0].y, boven = vrijHoeken[1].y, H = Screen.height;
+            if (boven - onder < 10f || H <= 0f) return;
+            vliegcamera.beeldVerschuiving = (onder + boven) * 0.5f / H - 0.5f;
+            if (!afstand || !MolecuulLevel) return;
+            var c = vliegcamera.GetComponent<Camera>();
+            if (c == null) return;
+            float tanV = Mathf.Tan(c.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            float dV = molecuul.Straal / (tanV * (boven - onder) / H);
+            float dH = molecuul.Straal / (tanV * c.aspect * 0.9f);
+            vliegcamera.PasAfstand(Mathf.Max(dV, dH) * 1.05f);
+        }
 
         // resterende tijd als "6 s" of "2 min"
         static string Duur(double s)

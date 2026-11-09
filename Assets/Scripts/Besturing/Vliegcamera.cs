@@ -34,7 +34,24 @@ namespace WaterSim.Besturing
         [Tooltip("Graden per seconde bij A/D en Q/E.")]
         public float draaiToets = 70f;
 
-        float yaw, pitch, afstand = 60f;
+        [Tooltip("Verschuift het draaipunt omhoog (+) of omlaag (−) in beeld, als deel van de schermhoogte; zo staat het molecuul midden in het vrije stuk boven het paneel.")]
+        public float beeldVerschuiving;
+
+        float yaw, pitch, afstand = 60f, doelAfstand = -1f;
+
+        /// <summary>Huidige afstand tot het draaipunt (Å).</summary>
+        public float Afstand => afstand;
+
+        /// <summary>Laat de camera vloeiend naar deze afstand gaan (stopt zodra de gebruiker zelf zoomt).</summary>
+        public void PasAfstand(float doel) => doelAfstand = Mathf.Clamp(doel, minAfstand, maxAfstand);
+
+        /// <summary>Knop + (richting 1) of − (richting −1): dichterbij of verder weg.</summary>
+        public void Zoom(int richting)
+        {
+            doelAfstand = -1f;
+            if (draaiOm) afstand = Mathf.Clamp(afstand * (richting > 0 ? 0.8f : 1.25f), minAfstand, maxAfstand);
+            else transform.position += transform.forward * (1.5f * richting);
+        }
         bool muisOpUI, draaiOm;
 
         /// <summary>Aan: de camera draait om <see cref="draaiPunt"/> (los blok). Uit: vrij vliegen.</summary>
@@ -87,7 +104,20 @@ namespace WaterSim.Besturing
                     som += t.delta.ReadValue();
                 }
                 if (vingers == 1) kijk += som;
-                else if (vingers >= 2) beweeg.z += som.y / vingers * vingerVlieg;
+                else if (vingers >= 2)
+                {
+                    beweeg.z += som.y / vingers * vingerVlieg;
+                    // knijpen: vingers uit elkaar = dichterbij
+                    Vector2 p0 = Vector2.zero, p1 = Vector2.zero, d0 = Vector2.zero, d1 = Vector2.zero; int n = 0;
+                    foreach (var t in scherm.touches)
+                    {
+                        if (!t.press.isPressed || (OpUI != null && OpUI(t.startPosition.ReadValue()))) continue;
+                        if (n == 0) { p0 = t.position.ReadValue(); d0 = t.delta.ReadValue(); }
+                        else if (n == 1) { p1 = t.position.ReadValue(); d1 = t.delta.ReadValue(); }
+                        n++;
+                    }
+                    if (n >= 2) beweeg.z += (Vector2.Distance(p0, p1) - Vector2.Distance(p0 - d0, p1 - d1)) * vingerVlieg * 1.5f;
+                }
                 aanraking |= vingers > 0;
             }
 
@@ -118,9 +148,18 @@ namespace WaterSim.Besturing
                 // slepen pakt het blok vast: naar rechts slepen draait het blok naar rechts
                 yaw += -kijk.x * kijkGevoeligheid + Mathf.Sign(beweeg.x) * (beweeg.x != 0f ? draaiToets * dt : 0f);
                 pitch = Mathf.Clamp(pitch - kijk.y * kijkGevoeligheid + Mathf.Sign(beweeg.y) * (beweeg.y != 0f ? draaiToets * dt : 0f), -85f, 85f);
+                if (beweeg.z != 0f) doelAfstand = -1f;
                 afstand = Mathf.Clamp(afstand * Mathf.Exp(-beweeg.z * 0.08f), minAfstand, maxAfstand);
+                if (doelAfstand > 0f)
+                {
+                    afstand = Mathf.Lerp(afstand, doelAfstand, 1f - Mathf.Exp(-6f * dt));
+                    if (Mathf.Abs(afstand - doelAfstand) < 0.01f) doelAfstand = -1f;
+                }
                 transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
-                transform.position = draaiPunt - transform.forward * afstand;
+                // camera iets omlaag schuiven zodat het draaipunt hoger in beeld staat (boven het paneel)
+                var c = GetComponent<Camera>();
+                float halfHoogte = afstand * Mathf.Tan((c != null ? c.fieldOfView : 60f) * 0.5f * Mathf.Deg2Rad);
+                transform.position = draaiPunt - transform.forward * afstand - transform.up * (2f * halfHoogte * beeldVerschuiving);
                 return;
             }
             yaw += kijk.x * kijkGevoeligheid;
