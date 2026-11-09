@@ -198,7 +198,38 @@ browser van een Quest draaien, in een paar uur werk. Zo test je bewegingsziekte 
 | 1. Kern (ijsrooster + ijsregels) | klaar — 21 tests |
 | 2. Weergave | klaar — 60 fps op Android |
 | 3. Smelten | klaar — energiemodel, vloeistof, los blok; werkt op Android |
-| 4. App-schil | volgende |
+| 4. App-schil | bezig — startscherm, icoon, achtergrond en tegels klaar |
+
+### Wat er nog moet gebeuren (bijgewerkt 9 november 2026)
+
+**Fase 4 afmaken (app-schil)**
+1. **Simulatiescherm in glas-en-ijsstijl:** bovenbalk en onderpaneel als glas, oranje voor actieve
+   knoppen, temperatuurschuif blauw → wit → oranje. Kleine klus.
+2. **Opdrachten (deel B):** eerst samen de inhoud vastleggen (per level × league: vraagsoort,
+   tekst, antwoord, tip), daarna bouwen: tipbalk, antwoordvak/meerkeuze, check, sterren opslaan.
+   De grootste stap van fase 4.
+3. **Uitleg-schermpjes per level** (kort, met plaatje) en de teksten nalopen (NL + EN).
+4. **Afronden:** fase 4 samenvoegen met main; test op Android (en iPad).
+
+**Fase 5 · Koken**
+5. Verdampen aan het oppervlak, belletjes, plateau bij 100 °C (energiemodel bestaat al),
+   gasweergave (bijna leeg, met tijdvertraging), fasediagram met druk. Level 6 speelbaar maken.
+
+**Levels 1 en 2**
+6. Level 1 (één molecuul: hoek, δ+/δ−, dipool) en level 2 (twee moleculen, de H-brug) als eigen
+   kleine 3D-scènes. Hergebruikt de weergave van het kristal.
+
+**Fase 6 · Andere ijssoorten**
+7. GenIce2 → eenheidscellen (Ic, XI, III, V, VI, VII, amorf, methaanhydraat); schuine cellen in
+   het rooster; "zinkt of drijft?" via het fasediagram. Past in de XPRT League.
+
+**Fase 7 · VR**
+8. Eerst een snelle test (browserprototype in de Quest-browser), daarna een OpenXR-build.
+
+**Fase 8 · Uitbrengen**
+9. Store-materiaal (icoon is klaar), privacytekst, testen met leerlingen, naam vrij in de stores.
+
+Doorlopend: de punten onder "Later afstemmen" (kalotten, details smelten).
 
 ### Later afstemmen (bewust uitgesteld)
 
