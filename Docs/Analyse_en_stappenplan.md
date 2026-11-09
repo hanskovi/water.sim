@@ -198,7 +198,7 @@ browser van een Quest draaien, in een paar uur werk. Zo test je bewegingsziekte 
 | 1. Kern (ijsrooster + ijsregels) | klaar — 21 tests |
 | 2. Weergave | klaar — 60 fps op Android |
 | 3. Smelten | klaar — energiemodel, vloeistof, los blok; werkt op Android |
-| 4. App-schil | bezig — startscherm, icoon, achtergrond en tegels klaar |
+| 4. App-schil | bezig — startscherm, simulatiescherm, icoon en tegels klaar; past op telefoons en tablets |
 
 ### Wat er nog moet gebeuren (bijgewerkt 9 november 2026)
 
@@ -233,7 +233,10 @@ Doorlopend: de punten onder "Later afstemmen" (kalotten, details smelten).
 ### Later afstemmen (bewust uitgesteld)
 
 - ~~Kalotten~~ — opgelost: berekende bollen (impostors), CPK-kleuren, donkere rand, Bondi-stralen.
-- **Telefoontest** van MSAA 4× en kalotten in het losse blok (snelheid).
+- ~~Telefoontest~~ — 60 fps op Android met MSAA 4× en kalotten (oneindig kristal); het losse blok
+  met kalotten nog even meten.
+- **Liggende iPad:** de opmaak schaalt goed, maar oogt klein en de nevel rond de kolom is te wazig.
+  Eventueel een eigen opmaak voor liggend (twee kolommen).
 - **Details van het smelten en de vloeistof:** hoe het smeltfront eruitziet, hoe snel moleculen
   bewegen, wat er precies in beeld gebeurt bij de overgang ijs ↔ water.
 - **Eerste keer laden in de editor:** shaders compileren dan even (in een build niet).
