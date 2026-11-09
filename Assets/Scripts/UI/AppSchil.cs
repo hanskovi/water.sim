@@ -519,6 +519,16 @@ namespace WaterSim.UI
             Knop(terug, () => ToonPagina(Pagina.Start));
             var titel = Tekst(balk.transform, "Titel", $"<b>{level + 1}</b> · {Teksten.T($"level.{level + 1}.titel")}", 15f, Color.white);
             LE(titel.gameObject, flexW: 1f);
+            // vorige / volgende model, zonder terug naar het startscherm
+            for (int i = 0; i < 2; i++)
+            {
+                int stap = i == 0 ? -1 : 1;
+                var k = Vlak(balk.transform, i == 0 ? "Vorige" : "Volgende", KnopGlas, 8f);
+                LE(k.gameObject, prefW: 34f);
+                var pijl = Icoon(k.transform, "Pijl", i == 0 ? PijlLinks() : PijlRechts(), Color.white);
+                Vul(pijl.rectTransform, 9, 9, 9, 9);
+                Knop(k, () => WisselLevel(stap));
+            }
             if (!verkennen) Sterpil(balk.transform);
 
             // vrije ruimte in het midden: daar kijk en vlieg je rond
@@ -813,6 +823,22 @@ namespace WaterSim.UI
             schakelaars.Add((bw.img, bw.t, () => kristal.beweging));
             var noot = Tekst(paneel.transform, "Model", Teksten.T("model.ijs"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
             LE(noot.gameObject, prefH: 28f);
+        }
+
+        // naar het vorige of volgende speelbare level (rondlopend), meteen in het simulatiescherm
+        void WisselLevel(int stap)
+        {
+            int nieuw = level;
+            for (int n = 0; n < Levels.Length; n++)
+            {
+                nieuw = (nieuw + stap + Levels.Length) % Levels.Length;
+                if (Levels[nieuw].speelbaar) break;
+            }
+            if (nieuw == level) return;
+            level = nieuw;
+            PlayerPrefs.SetInt("watersim.level", level);
+            infoOpen = false;
+            ToonPagina(Pagina.Sim);
         }
 
         void Sterpil(Transform balk)
