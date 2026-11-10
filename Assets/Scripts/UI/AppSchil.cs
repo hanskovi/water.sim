@@ -143,7 +143,7 @@ namespace WaterSim.UI
             if (canvas != null) Destroy(canvas.gameObject);
             snel.Clear(); schakelaars.Clear(); infoKnoppen.Clear();
             schuif = null; ring = null; kromme = null;      // alleen level 4 bouwt deze opnieuw
-            zoomHouder = null; glasW = null; meerW = null; luchtSchuif = null;
+            zoomHouder = null; glasW = null; meerW = null; poolW = null; luchtSchuif = null;
 
             var go = new GameObject("Interface", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             go.transform.SetParent(transform, false);
@@ -848,7 +848,8 @@ namespace WaterSim.UI
 
         // ---------- level 5: glas en meer ----------
         WaterSim.Sim.Meer meer;
-        int macroModus;              // 0 = glas, 1 = meer
+        int macroModus;              // 0 = glas, 1 = meer, 2 = poolkappen (glas en poolkappen vallen onder de tab IJsmassa)
+        Poolweergave poolW;
         int vloeistofKeuze;          // 0 = zoet water, 1 = zeewater, 2 = alcohol
         float luchtT = -5f;
         bool metZon, jaarModus, opRots, aanHetSmelten;
@@ -898,6 +899,20 @@ namespace WaterSim.UI
                     lab.rectTransform.anchoredPosition = new Vector2(0f, -3f);
                 }
             }
+            else if (macroModus == 2)
+            {
+                poolW = vlak.gameObject.AddComponent<Poolweergave>();
+                poolW.raycastTarget = false;
+                poolW.zee = Lin(Hex("145E8A")) * new Color(1f, 1f, 1f, 0.9f); poolW.land = Lin(Hex("5C4A3A")); poolW.ijs = Lin(Hex("E8F7FF"));
+                poolW.lLand = Tekst(vlak, "Land", Teksten.T("pool.land"), 12f, Color.white, TextAlignmentOptions.Center, true);
+                poolW.lZee = Tekst(vlak, "Zee", Teksten.T("pool.zee"), 12f, Color.white, TextAlignmentOptions.Center, true);
+                poolW.lStijging = Tekst(vlak, "Stijging", "", 12f, Lin(Hex("FFB48A")), TextAlignmentOptions.Right, true);
+                foreach (var l in new[] { poolW.lLand, poolW.lZee, poolW.lStijging })
+                {
+                    l.rectTransform.sizeDelta = new Vector2(170f, 18f);
+                    l.outlineWidth = 0.2f; l.outlineColor = new Color32(4, 16, 26, 230);
+                }
+            }
             else
             {
                 meerW = vlak.gameObject.AddComponent<Meerweergave>();
@@ -924,16 +939,38 @@ namespace WaterSim.UI
             var paneel = Waterglas(simPagina, "Bediening", 14f);
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
-            Beschrijving(paneel, macroModus == 0 ? "level.5.zie.glas" : "level.5.zie.meer");
+            Beschrijving(paneel, macroModus == 0 ? "level.5.zie.glas" : macroModus == 2 ? "level.5.zie.pool" : "level.5.zie.meer");
 
+            void ZetModus(int m) { macroModus = m; PlayerPrefs.SetInt("watersim.macro", m); gesmolten = 0f; aanHetSmelten = false; Bouw(); }
             var tabs = Rij(paneel.transform, "Modus", 34f, 6f);
-            for (int i = 0; i < 2; i++)
+            var tIjs = Pilknop(tabs.transform, Teksten.T("ijsmassa"), () => { if (macroModus == 1) ZetModus(PlayerPrefs.GetInt("watersim.ijsmassa", 0)); });
+            schakelaars.Add((tIjs.img, tIjs.t, () => macroModus != 1));
+            var tMeer = Pilknop(tabs.transform, Teksten.T("meer"), () => ZetModus(1));
+            schakelaars.Add((tMeer.img, tMeer.t, () => macroModus == 1));
+            if (macroModus != 1)
             {
-                int m = i;
-                var p = Pilknop(tabs.transform, Teksten.T(i == 0 ? "glas" : "meer"), () => { macroModus = m; PlayerPrefs.SetInt("watersim.macro", m); Bouw(); });
-                schakelaars.Add((p.img, p.t, () => macroModus == m));
+                var sub = Rij(paneel.transform, "IJsmassa", 30f, 6f);
+                for (int i = 0; i < 2; i++)
+                {
+                    int m = i == 0 ? 0 : 2;
+                    var p = Pilknop(sub.transform, Teksten.T(i == 0 ? "glas" : "poolkappen"), () => { PlayerPrefs.SetInt("watersim.ijsmassa", m); ZetModus(m); });
+                    p.t.fontSize = 12.5f;
+                    schakelaars.Add((p.img, p.t, () => macroModus == m));
+                }
             }
-            if (macroModus == 0)
+            if (macroModus == 2)
+            {
+                var rp = Rij(paneel.transform, "Smelten", 34f, 6f);
+                var sm = Pilknop(rp.transform, "", () =>
+                {
+                    if (gesmolten >= 1f || aanHetSmelten) { gesmolten = 0f; aanHetSmelten = false; }
+                    else aanHetSmelten = true;
+                });
+                tSmeltKnop = sm.t;
+                schakelaars.Add((sm.img, sm.t, () => aanHetSmelten));
+                tGlasStatus = Tekst(paneel.transform, "Status", "", 13f, IJsTekst, TextAlignmentOptions.Left, false, true);
+            }
+            else if (macroModus == 0)
             {
                 var r = Rij(paneel.transform, "Vloeistof", 34f, 6f);
                 for (int i = 0; i < 3; i++)
@@ -1011,7 +1048,7 @@ namespace WaterSim.UI
                 tSchaats = Tekst(schaatsPil.transform, "Tekst", "", 12f, Color.white, TextAlignmentOptions.Center, true);
                 Vul(tSchaats.rectTransform, 6, 0, 6, 0);
             }
-            var noot = Tekst(paneel.transform, "Model", Teksten.T(macroModus == 0 ? "model.glas" : "model.meer"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
+            var noot = Tekst(paneel.transform, "Model", Teksten.T(macroModus == 0 ? "model.glas" : macroModus == 2 ? "model.pool" : "model.meer"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
             LE(noot.gameObject, prefH: 28f);
         }
 
@@ -1048,6 +1085,16 @@ namespace WaterSim.UI
                         : (opRots ? "glas.na.rots" : !drijft ? "glas.na.zinkt" : vloeistofKeuze == 1 ? "glas.na.zee" : "glas.na.zoet");
                     tGlasStatus.text = Teksten.T(sleutel);
                 }
+            }
+            else if (macroModus == 2 && poolW != null)
+            {
+                if (aanHetSmelten) { gesmolten = Mathf.Min(1f, gesmolten + Time.deltaTime / 8f); if (gesmolten >= 1f) aanHetSmelten = false; }
+                poolW.gesmolten = gesmolten;
+                poolW.lStijging.text = gesmolten > 0f ? string.Format(Teksten.T("pool.stijging"), Teksten.Getal(gesmolten * WaterSim.Sim.Constanten.ZeespiegelGroenland, "0.0")) : "";
+                if (tSmeltKnop != null) tSmeltKnop.text = Teksten.T(gesmolten > 0f ? "opnieuw" : "glas.smelt");
+                if (tGlasStatus != null)
+                    tGlasStatus.text = gesmolten < 1f ? Teksten.T("pool.status")
+                        : string.Format(Teksten.T("pool.na"), Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelGroenland, "0.0"), Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelAntarctica, "0"));
             }
             else if (macroModus == 1 && meerW != null && meer != null)
             {

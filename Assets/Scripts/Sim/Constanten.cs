@@ -24,6 +24,10 @@ namespace WaterSim.Sim
         public const double DichtheidZeewater = 1.025;
         public const double DichtheidEthanol = 0.789;
 
+        // --- Poolkappen: zeespiegelstijging als al het ijs zou smelten (m) ---
+        public const double ZeespiegelGroenland = 7.4;      // Groenlandse ijskap (Morlighem e.a. 2017)
+        public const double ZeespiegelAntarctica = 58;      // Antarctische ijskap (Fretwell e.a. 2013)
+
         // --- Warmtegeleiding (Binas) ---
         public const double WarmtegeleidingIjs = 2.2;       // W/(m·K), bij 0 °C
 

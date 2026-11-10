@@ -269,8 +269,8 @@ namespace WaterSim.UI
 
         void Maten(Rect r, out float boven, out float onder, out float schaal)
         {
-            boven = r.yMax - r.height * 0.12f;
-            onder = r.yMin + r.height * 0.07f;
+            boven = r.yMax - Mathf.Max(r.height * 0.36f, 150f);   // bovenin ruimte voor lucht, zon en het formulekaartje
+            onder = r.yMin + r.height * 0.05f;
             schaal = meer != null ? (boven - onder) / (float)meer.Diepte : 1f;
         }
 
@@ -307,13 +307,14 @@ namespace WaterSim.UI
                 }
             }
             else Tekenhulp.Lijn(vh, new Vector2(x0, boven), new Vector2(x1, boven), 2f, new Color(0.65f, 0.9f, 0.97f, 1f));
+            float t = Time.time;
             // zon: groter en feller bij meer zonlicht
             if (meer.Zon > 1)
             {
-                float zr = Mathf.Lerp(7f, 15f, Mathf.Clamp01((float)meer.Zon / 230f));
-                var zm = new Vector2(x1 - 22f, r.yMax - 18f);
-                var zk = zon; zk.a = Mathf.Lerp(0.5f, 1f, Mathf.Clamp01((float)meer.Zon / 230f));
-                Tekenhulp.Schijf(vh, zm, zr, zk, 24);
+                float sterkte = Mathf.Clamp01((float)meer.Zon / 230f);
+                float ruimte = r.yMax - boven;
+                var zm = new Vector2(x0 + 52f, boven + ruimte * 0.5f);
+                Zonnetje.Teken(vh, zm, Mathf.Lerp(11f, 19f, sterkte), Mathf.Min(ruimte * 0.46f, 60f) * Mathf.Lerp(0.7f, 1f, sterkte), Mathf.Lerp(0.55f, 1f, sterkte), t);
             }
 
             // bodem (golvend) en een vis vlak boven de bodem
@@ -324,7 +325,6 @@ namespace WaterSim.UI
                 golf.Add(new Vector2(x, onder + 4f * Mathf.Sin(k * 0.9f)));
             }
             for (int k = 0; k < golf.Count - 1; k++) Blok(vh, golf[k].x, r.yMin, golf[k + 1].x, Mathf.Max(golf[k].y, golf[k + 1].y), bodem);
-            float t = Time.time;
             var v = new Vector2(Mathf.Lerp(x0 + 30f, x1 - 70f, 0.5f + 0.5f * Mathf.Sin(t * 0.25f)), onder + 0.06f * (boven - onder) + 3f * Mathf.Sin(t));
             int kant = Mathf.Cos(t * 0.25f) >= 0 ? 1 : -1;      // de vis zwemt de kant op waar hij heen gaat
             var neus = v + new Vector2(9f * kant, 0f);
@@ -348,7 +348,8 @@ namespace WaterSim.UI
             {
                 lIjs.rectTransform.anchorMin = lIjs.rectTransform.anchorMax = Vector2.zero;
                 lIjs.rectTransform.pivot = new Vector2(0f, 0f);
-                lIjs.rectTransform.anchoredPosition = new Vector2(12f, boven + 0.08f * (float)meer.Ijsdikte * schaal + 4f - r.yMin);
+                float sw = meer.Smeltwater > 0.0005 ? Mathf.Clamp((float)meer.Smeltwater * schaal * 3f, 2f, 7f) : 0f;
+                lIjs.rectTransform.anchoredPosition = new Vector2(12f, boven + 0.08f * (float)meer.Ijsdikte * schaal + sw + 5f - r.yMin);
             }
         }
 
@@ -365,6 +366,128 @@ namespace WaterSim.UI
             int i = vh.currentVertCount;
             vh.AddVert(a, k, Vector4.zero); vh.AddVert(b, k, Vector4.zero); vh.AddVert(c, k, Vector4.zero);
             vh.AddTriangle(i, i + 1, i + 2);
+        }
+    }
+
+    /// <summary>Zon met een gloeiende schijf (geel midden, oranje rand) en veel dunne stralen die langzaam draaien.</summary>
+    static class Zonnetje
+    {
+        public static void Teken(VertexHelper vh, Vector2 m, float straal, float straalLengte, float dekking, float tijd)
+        {
+            var geel = new Color(1f, 0.93f, 0.35f, dekking);
+            var oranje = new Color(1f, 0.67f, 0.25f, dekking);
+            var weg = new Color(1f, 0.85f, 0.3f, 0f);
+            // stralen: smalle driehoekjes, om en om lang en kort, naar buiten toe doorzichtig
+            int n = 64;
+            for (int k = 0; k < n; k++)
+            {
+                float a = (k + tijd * 0.4f) * Mathf.PI * 2f / n;
+                float lang = (k % 2 == 0 ? 1f : 0.72f) * straalLengte;
+                float breed = Mathf.PI * 2f / n * 0.32f;
+                var basis1 = m + new Vector2(Mathf.Cos(a - breed), Mathf.Sin(a - breed)) * straal * 1.02f;
+                var basis2 = m + new Vector2(Mathf.Cos(a + breed), Mathf.Sin(a + breed)) * straal * 1.02f;
+                var punt = m + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (straal + lang);
+                int i = vh.currentVertCount;
+                vh.AddVert(basis1, geel, Vector4.zero); vh.AddVert(basis2, geel, Vector4.zero); vh.AddVert(punt, weg, Vector4.zero);
+                vh.AddTriangle(i, i + 1, i + 2);
+            }
+            // schijf: geel in het midden, oranje aan de rand
+            int start = vh.currentVertCount;
+            vh.AddVert(m, geel, Vector4.zero);
+            for (int k = 0; k <= 40; k++)
+            {
+                float a = k * Mathf.PI * 2f / 40f;
+                vh.AddVert(m + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * straal, oranje, Vector4.zero);
+                if (k > 0) vh.AddTriangle(start, start + k, start + k + 1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Level 5, poolkappen: doorsnede met landijs op een continent (zoals Groenland) en drijvend zee-ijs (Noordpool).
+    /// Bij smelten stijgt de zeespiegel alleen door het landijs. Hoogtes niet op schaal.
+    /// </summary>
+    public class Poolweergave : MaskableGraphic
+    {
+        [Range(0f, 1f)] public float gesmolten;
+        public Color zee = new Color(0.08f, 0.35f, 0.55f, 0.85f), land = new Color(0.36f, 0.3f, 0.24f, 1f), ijs = new Color(0.9f, 0.97f, 1f, 0.95f);
+        public TextMeshProUGUI lLand, lZee, lStijging;
+
+        void Update() { SetVerticesDirty(); }
+
+        protected override void OnPopulateMesh(VertexHelper vh)
+        {
+            vh.Clear();
+            var r = rectTransform.rect;
+            if (r.width < 60f || r.height < 80f) return;
+            float x0 = r.xMin + 6f, x1 = r.xMax - 6f, bodem = r.yMin + 6f;
+            float zee0 = r.yMin + r.height * 0.34f;
+            float stijg = r.height * 0.07f * gesmolten;                 // overdreven: alleen landijs laat het stijgen
+            float zeeNu = zee0 + stijg;
+            float landRand = Mathf.Lerp(x0, x1, 0.46f), landTop = zee0 + r.height * 0.08f;
+
+            // zee
+            Blok(vh, x0, bodem, x1, zeeNu, zee);
+            // land (continent) met een grillige kust
+            var kust = new List<Vector2> { new Vector2(x0, bodem), new Vector2(landRand + 14f, bodem), new Vector2(landRand, landTop - 6f), new Vector2(landRand - 10f, landTop) , new Vector2(x0, landTop + 4f) };
+            Veelhoek(vh, kust, land);
+            // landijs: koepel, wordt lager bij smelten
+            float koepel = r.height * 0.36f * (1f - gesmolten);
+            if (koepel > 1f)
+            {
+                var k = new List<Vector2>();
+                float a = x0 + 6f, b = landRand - 14f;
+                for (int i = 0; i <= 24; i++)
+                {
+                    float f = i / 24f;
+                    k.Add(new Vector2(Mathf.Lerp(a, b, f), landTop + koepel * Mathf.Pow(Mathf.Sin(f * Mathf.PI), 0.6f)));
+                }
+                k.Add(new Vector2(b, landTop)); k.Add(new Vector2(a, landTop));
+                Veelhoek(vh, k, ijs);
+            }
+            // zee-ijs: drijvende schots (92 % onder water), wordt dunner maar het niveau verandert er niet door
+            float dik = 14f * (1f - gesmolten);
+            if (dik > 0.5f)
+            {
+                float a = Mathf.Lerp(x0, x1, 0.6f), b = Mathf.Lerp(x0, x1, 0.94f);
+                Blok(vh, a, zeeNu - 0.92f * dik, b, zeeNu + 0.08f * dik, ijs);
+            }
+            // oude zeespiegel als stippellijn
+            if (gesmolten > 0f)
+                for (float x = x0; x < x1; x += 8f)
+                    Tekenhulp.Lijn(vh, new Vector2(x, zee0), new Vector2(Mathf.Min(x + 4f, x1), zee0), 1.2f, new Color(1f, 1f, 1f, 0.6f));
+            Tekenhulp.Lijn(vh, new Vector2(landRand - 4f, zeeNu), new Vector2(x1, zeeNu), 2f, new Color(0.65f, 0.9f, 0.97f, 1f));
+
+            // labels
+            Zet(lLand, new Vector2(Mathf.Lerp(x0, landRand, 0.45f), landTop + koepel + 14f), r, 0.5f);
+            Zet(lZee, new Vector2(Mathf.Lerp(x0, x1, 0.77f), zeeNu + 22f), r, 0.5f);
+            Zet(lStijging, new Vector2(x1 - 4f, zee0 - 16f), r, 1f);
+        }
+
+        static void Zet(TextMeshProUGUI l, Vector2 p, Rect r, float pivotX)
+        {
+            if (l == null) return;
+            l.rectTransform.anchorMin = l.rectTransform.anchorMax = Vector2.zero;
+            l.rectTransform.pivot = new Vector2(pivotX, 0.5f);
+            l.rectTransform.anchoredPosition = p - r.min;
+        }
+
+        static void Blok(VertexHelper vh, float xa, float ya, float xb, float yb, Color k)
+        {
+            int i = vh.currentVertCount;
+            vh.AddVert(new Vector3(xa, ya), k, Vector4.zero); vh.AddVert(new Vector3(xb, ya), k, Vector4.zero);
+            vh.AddVert(new Vector3(xb, yb), k, Vector4.zero); vh.AddVert(new Vector3(xa, yb), k, Vector4.zero);
+            vh.AddTriangle(i, i + 1, i + 2); vh.AddTriangle(i, i + 2, i + 3);
+        }
+
+        // bolle veelhoek als waaier vanuit het zwaartepunt
+        static void Veelhoek(VertexHelper vh, List<Vector2> p, Color k)
+        {
+            var m = Vector2.zero; foreach (var q in p) m += q; m /= p.Count;
+            int s = vh.currentVertCount;
+            vh.AddVert(m, k, Vector4.zero);
+            foreach (var q in p) vh.AddVert(q, k, Vector4.zero);
+            for (int i = 0; i < p.Count; i++) vh.AddTriangle(s, s + 1 + i, s + 1 + (i + 1) % p.Count);
         }
     }
 }

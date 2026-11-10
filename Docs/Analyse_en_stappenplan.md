@@ -230,6 +230,28 @@ browser van een Quest draaien, in een paar uur werk. Zo test je bewegingsziekte 
 
 Doorlopend: de punten onder "Later afstemmen" (kalotten, details smelten).
 
+### Level 6 · Ontdek (meer leren, buiten de quiz) — onderwerpen (10 november 2026)
+
+Gekozen door de gebruiker:
+- **Mpemba-effect** — onderzoekscène met de hypotheses (verdampen, stroming, onderkoeling/kiemvorming,
+  H-brugstructuur), elk met label aangetoond / mogelijk / omstreden.
+- **Zoet ↔ zout water** — veel zoet smeltwater (Groenland) in de Noord-Atlantische Oceaan maakt het
+  zeewater lichter; het zinkt minder goed en de AMOC (thermohaliene circulatie, Golfstroom) kan
+  verzwakken of stilvallen. Verwijzing staat al bij level 5 › Poolkappen.
+- **Vorstverwering** — water in een spleet bevriest, zet 9 % uit en drukt de steen kapot.
+- **Onderkoelde regen / ijzel** — druppels onder 0 °C die bevriezen zodra ze iets raken.
+- **Sneeuwvlokvormen** — vorm hangt af van temperatuur en vochtigheid (Nakaya-diagram).
+
+Voorstellen erbij:
+- **VR** — door het ijs vliegen (eerst WebXR-test in de Quest-browser).
+- **Fasediagram** — druk en temperatuur: snelkookpan, Mount Everest, tripelpunt, schuine smeltlijn.
+- **Andere ijssoorten** — ijs Ic, ijs VII (zinkt!), amorf ijs, methaanhydraat ("brandend ijs").
+- **Zwaar ijs** — ijs van D₂O (≈ 1,02 g/cm³) zinkt in gewoon water.
+- **Zee-ijs en pekel** — bij bevriezen wordt het zout uitgestoten; zeewater bevriest bij ≈ −1,9 °C.
+- **Onderkoeld flesje** — onder 0 °C nog vloeibaar, bevriest in één klap bij een tik (kiemvorming).
+- **Hagel** — groeit in lagen in een onweerswolk.
+- **Waarom is ijs glad?** — vloeibaar laagje aan het oppervlak (premelting) en wrijvingswarmte, niet de druk.
+
 ### Later afstemmen (bewust uitgesteld)
 
 - ~~Kalotten~~ — opgelost: berekende bollen (impostors), CPK-kleuren, donkere rand, Bondi-stralen.
