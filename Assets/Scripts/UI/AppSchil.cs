@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -146,7 +147,7 @@ namespace WaterSim.UI
         {
             bouwen = true;
             if (canvas != null) Destroy(canvas.gameObject);
-            snel.Clear(); schakelaars.Clear(); infoKnoppen.Clear();
+            snel.Clear(); schakelaars.Clear(); infoKnoppen.Clear(); vasteHoogtes.Clear();
             schuif = null; ring = null; kromme = null;      // alleen level 4 bouwt deze opnieuw
             zoomHouder = null; glasW = null; meerW = null; poolW = null; luchtSchuif = null;
 
@@ -985,7 +986,10 @@ namespace WaterSim.UI
                 schakelaars.Add((sz.img, sz.t, () => smeltZee || gesmoltenZee >= 1f));
                 var op = Pilknop(rp.transform, Teksten.T("opnieuw"), () => { gesmoltenLand = gesmoltenZee = 0f; smeltLand = smeltZee = false; }, 0.7f);
                 op.t.fontSize = 12.5f;
-                tGlasStatus = Tekst(paneel.transform, "Status", "", 13f, IJsTekst, TextAlignmentOptions.Left, false, true);
+                tGlasStatus = Tekst(paneel.transform, "Status", "", 13f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+                string gl = Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelGroenland, "0.0"), an = Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelAntarctica, "0");
+                VasteHoogte(tGlasStatus, Teksten.T("pool.status"), string.Format(Teksten.T("pool.na"), gl, an),
+                            string.Format(Teksten.T("pool.na.land"), gl), Teksten.T("pool.na.zee"));
             }
             else if (macroModus == 0)
             {
@@ -1013,7 +1017,9 @@ namespace WaterSim.UI
                 sm.t.fontSize = 12.5f;
                 tSmeltKnop = sm.t;
                 schakelaars.Add((sm.img, sm.t, () => aanHetSmelten));
-                tGlasStatus = Tekst(paneel.transform, "Status", "", 13f, IJsTekst, TextAlignmentOptions.Left, false, true);
+                tGlasStatus = Tekst(paneel.transform, "Status", "", 13f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+                VasteHoogte(tGlasStatus, new[] { "glas.status.drijft", "glas.status.zee", "glas.status.zinkt", "glas.status.rots",
+                                                 "glas.na.zoet", "glas.na.zee", "glas.na.rots", "glas.na.zinkt" }.Select(Teksten.T).ToArray());
             }
             else
             {
@@ -1074,6 +1080,32 @@ namespace WaterSim.UI
         }
 
         TextMeshProUGUI tLuchtWaarde;
+
+        // ---------- vaste hoogte voor teksten die wisselen ----------
+        // Een tekst die per situatie anders is (bv. de uitkomst na het smelten) krijgt de hoogte van de langste variant,
+        // gemeten op de echte breedte en in de gekozen taal. Zo verandert het paneel niet van hoogte en springt het beeld niet.
+        readonly List<(TextMeshProUGUI t, string[] varianten, float breedte)> vasteHoogtes = new List<(TextMeshProUGUI, string[], float)>();
+
+        void VasteHoogte(TextMeshProUGUI t, params string[] varianten)
+        {
+            vasteHoogtes.Add((t, varianten, -1f));
+            LE(t.gameObject, prefH: t.fontSize * 3.6f, minH: t.fontSize * 3.6f);     // eerste schatting (3 regels) tot de breedte bekend is
+        }
+
+        void PasVasteHoogtesAan()
+        {
+            for (int i = 0; i < vasteHoogtes.Count; i++)
+            {
+                var (t, varianten, breedte) = vasteHoogtes[i];
+                if (t == null) continue;
+                float w = t.rectTransform.rect.width;
+                if (w < 10f || Mathf.Abs(w - breedte) < 0.5f) continue;
+                float h = 0f;
+                foreach (var v in varianten) h = Mathf.Max(h, t.GetPreferredValues(v, w, 0f).y);
+                LE(t.gameObject, prefH: Mathf.Ceil(h) + 1f, minH: Mathf.Ceil(h) + 1f);
+                vasteHoogtes[i] = (t, varianten, w);
+            }
+        }
 
         // nieuw meertje; in de jaar-modus begint het in de herfst van het gekozen klimaat
         void StartJaar()
@@ -1536,6 +1568,7 @@ namespace WaterSim.UI
             }
             if (MacroLevel)
             {
+                PasVasteHoogtesAan();
                 foreach (var k in schakelaars) Actief(k.img, k.t, k.aan());
                 WerkMacroBij();
                 return;
