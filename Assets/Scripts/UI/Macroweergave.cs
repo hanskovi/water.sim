@@ -7,78 +7,110 @@ using WaterSim.Sim;
 namespace WaterSim.UI
 {
     /// <summary>
-    /// Level 5, het glas: een ijsblokje in een vloeistof. Het deel onder het oppervlak komt uit
-    /// <see cref="Drijven.DeelOnder"/>; zinkt het, dan ligt het op de bodem.
+    /// Level 5, het glas: een ijsblokje in een vloeistof, drijvend of op een rots (landijs). Het deel onder het
+    /// oppervlak komt uit <see cref="Drijven.DeelOnder"/>; bij smelten volgt het niveau <see cref="Drijven.Niveaustijging"/>.
+    /// De stippellijn toont het niveau van vóór het smelten.
     /// </summary>
     public class Glasweergave : MaskableGraphic
     {
-        public float deelOnder = 0.917f;
-        public bool zinkt;
+        public double rhoIjs = Constanten.DichtheidIjsBinas, rhoVloeistof = 1, rhoSmeltwater = 1;
+        public bool opRots;
+        [Range(0f, 1f)] public float gesmolten;
         public Color vloeistof = new Color(0.12f, 0.5f, 0.66f, 0.55f);
         public Color ijs = new Color(0.86f, 0.95f, 1f, 0.9f);
+        public Color rots = new Color(0.42f, 0.38f, 0.34f, 1f);
         public TextMeshProUGUI lBoven, lOnder;
-
-        /// <summary>Rand van het glas in lokale coördinaten (voor het plaatsen van de inzoomvensters).</summary>
-        public Rect Glas { get; private set; }
-        public Vector2 Blokje { get; private set; }
-        public Vector2 Water { get; private set; }
 
         void Update() { SetVerticesDirty(); PlaatsLabels(); }
 
-        void Maten(Rect r, out float gw, out float gh, out Vector2 voet)
+        // vaste maten van het glas, het startniveau en het blokje
+        void Maten(Rect r, out float gw, out float gh, out Vector2 voet, out float niveau0, out float s0)
         {
             gw = Mathf.Min(r.width * 0.46f, r.height * 0.5f);
             gh = gw * 1.35f;
             voet = new Vector2(r.center.x, r.yMin + Mathf.Max(10f, (r.height - gh) * 0.35f));
+            niveau0 = voet.y + gh * (opRots ? 0.5f : 0.62f);
+            s0 = gw * (opRots ? 0.34f : 0.4f);
         }
+
+        float Breedte(float gw, float gh, Vector2 voet, float y) => 2f * Mathf.Lerp(gw * 0.42f, gw * 0.52f, (y - voet.y) / gh);
+
+        float Niveau(float gw, float gh, Vector2 voet, float niveau0, float s0) =>
+            niveau0 + (float)Drijven.Niveaustijging(s0 * s0, Breedte(gw, gh, voet, niveau0), rhoIjs, rhoVloeistof, rhoSmeltwater, !opRots, gesmolten);
 
         protected override void OnPopulateMesh(VertexHelper vh)
         {
             vh.Clear();
             var r = rectTransform.rect;
             if (r.width < 40f || r.height < 60f) return;
-            Maten(r, out float gw, out float gh, out var voet);
-            float onderB = gw * 0.42f, bovenB = gw * 0.52f;            // halve breedte onder en boven
+            Maten(r, out float gw, out float gh, out var voet, out float niveau0, out float s0);
+            float onderB = gw * 0.42f, bovenB = gw * 0.52f;
             Vector2 lo = voet + new Vector2(-onderB, 0f), ro = voet + new Vector2(onderB, 0f);
             Vector2 lb = voet + new Vector2(-bovenB, gh), rb = voet + new Vector2(bovenB, gh);
-            float niveau = voet.y + gh * 0.68f;
-            float BreedteOp(float y) => Mathf.Lerp(onderB, bovenB, (y - voet.y) / gh);
-            Glas = new Rect(lo.x, voet.y, 2f * bovenB, gh);
+            float niveau = Niveau(gw, gh, voet, niveau0, s0);
+            float t = Time.time;
+            double deel = Drijven.DeelOnder(rhoIjs, rhoVloeistof);
+            bool zinkt = !Drijven.Drijft(rhoIjs, rhoVloeistof);
 
-            // ijsblokje (eerst, zodat de vloeistof er doorschijnend overheen valt)
-            float s = gw * 0.4f, t = Time.time;
-            float y0 = zinkt ? voet.y + 3f : niveau - deelOnder * s + 1.2f * Mathf.Sin(t * 1.3f);
-            var m = new Vector2(voet.x + 2f * Mathf.Sin(t * 0.6f), y0 + s * 0.5f);
-            var rot = Quaternion.Euler(0f, 0f, zinkt ? -3f : -5f + 2f * Mathf.Sin(t * 0.9f));
-            var hoeken = new Vector2[4];
-            for (int k = 0; k < 4; k++)
+            // rots (landijs): steekt boven het water uit
+            float rotsTop = niveau0 + gh * 0.08f;
+            if (opRots)
             {
-                var h = new Vector2((k == 0 || k == 3 ? -1 : 1) * s * 0.5f, (k < 2 ? -1 : 1) * s * 0.5f);
-                hoeken[k] = m + (Vector2)(rot * h);
+                var rp = new[] { voet + new Vector2(-onderB * 0.75f, 2f), voet + new Vector2(onderB * 0.75f, 2f),
+                                 new Vector2(voet.x + s0 * 0.6f, rotsTop), new Vector2(voet.x - s0 * 0.6f, rotsTop) };
+                Vierhoek(vh, rp[0], rp[1], rp[2], rp[3], rots);
             }
-            Vierhoek(vh, hoeken[0], hoeken[1], hoeken[2], hoeken[3], ijs);
-            var rand = new Color(1f, 1f, 1f, 0.9f);
-            Tekenhulp.Lijnstuk(vh, new[] { hoeken[0], hoeken[1], hoeken[2], hoeken[3], hoeken[0] }, 1.6f, rand, false);
-            Blokje = m;
 
-            // vloeistof tot het niveau
-            float wn = BreedteOp(niveau);
+            // ijsblokje (krimpt bij smelten; eerst tekenen, zodat de vloeistof er doorschijnend overheen valt)
+            float s = s0 * Mathf.Sqrt(Mathf.Max(0f, 1f - gesmolten));
+            if (s > 1f)
+            {
+                float y0 = opRots ? rotsTop : zinkt ? voet.y + 3f : niveau - (float)deel * s + 1.2f * Mathf.Sin(t * 1.3f);
+                var m = new Vector2(voet.x + (opRots ? 0f : 2f * Mathf.Sin(t * 0.6f)), y0 + s * 0.5f);
+                var rot = Quaternion.Euler(0f, 0f, opRots ? 0f : zinkt ? -3f : -5f + 2f * Mathf.Sin(t * 0.9f));
+                var hoeken = new Vector2[4];
+                for (int k = 0; k < 4; k++)
+                {
+                    var h = new Vector2((k == 0 || k == 3 ? -1 : 1) * s * 0.5f, (k < 2 ? -1 : 1) * s * 0.5f);
+                    hoeken[k] = m + (Vector2)(rot * h);
+                }
+                Vierhoek(vh, hoeken[0], hoeken[1], hoeken[2], hoeken[3], ijs);
+                Tekenhulp.Lijnstuk(vh, new[] { hoeken[0], hoeken[1], hoeken[2], hoeken[3], hoeken[0] }, 1.6f, new Color(1f, 1f, 1f, 0.9f), false);
+                // smeltdruppels die van het blokje op de rots naar het water lopen
+                if (opRots && gesmolten > 0f && gesmolten < 1f)
+                    for (int k = 0; k < 3; k++)
+                    {
+                        float f = Mathf.Repeat(t * 0.8f + k / 3f, 1f);
+                        Tekenhulp.Schijf(vh, new Vector2(voet.x + s0 * 0.62f, Mathf.Lerp(rotsTop, niveau, f)), 2f, new Color(0.6f, 0.85f, 1f, 1f), 8);
+                    }
+            }
+
+            // vloeistof tot het (nieuwe) niveau, en een stippellijn op het oude niveau
+            float wn = Breedte(gw, gh, voet, niveau) * 0.5f;
             Vierhoek(vh, lo + new Vector2(2f, 2f), ro + new Vector2(-2f, 2f), new Vector2(voet.x + wn - 2f, niveau), new Vector2(voet.x - wn + 2f, niveau), vloeistof);
+            if (opRots) Vierhoek(vh, voet + new Vector2(-onderB * 0.75f, 2f), voet + new Vector2(onderB * 0.75f, 2f),
+                                 new Vector2(voet.x + s0 * 0.6f, Mathf.Min(rotsTop, niveau)), new Vector2(voet.x - s0 * 0.6f, Mathf.Min(rotsTop, niveau)), rots);
             Tekenhulp.Lijn(vh, new Vector2(voet.x - wn + 2f, niveau), new Vector2(voet.x + wn - 2f, niveau), 2f, new Color(0.65f, 0.9f, 0.97f, 1f));
-            Water = new Vector2(voet.x - wn * 0.55f, voet.y + gh * 0.22f);
+            if (gesmolten > 0f)
+            {
+                float w0 = Breedte(gw, gh, voet, niveau0) * 0.5f + 10f;
+                for (float x = voet.x - w0; x < voet.x + w0; x += 8f)
+                    Tekenhulp.Lijn(vh, new Vector2(x, niveau0), new Vector2(Mathf.Min(x + 4f, voet.x + w0), niveau0), 1.2f, new Color(1f, 1f, 1f, 0.6f));
+            }
 
             // glas
-            var glas = new Color(1f, 1f, 1f, 0.6f);
-            Tekenhulp.Lijnstuk(vh, new[] { lb, lo, ro, rb }, 2.5f, glas, true);
+            Tekenhulp.Lijnstuk(vh, new[] { lb, lo, ro, rb }, 2.5f, new Color(1f, 1f, 1f, 0.6f), true);
         }
 
         void PlaatsLabels()
         {
             var r = rectTransform.rect;
             if (r.width < 40f) return;
-            Maten(r, out float gw, out float gh, out var voet);
-            float niveau = voet.y + gh * 0.68f, x = voet.x + gw * 0.56f;
-            float s = gw * 0.4f;
+            Maten(r, out float gw, out float gh, out var voet, out float niveau0, out float s0);
+            float niveau = Niveau(gw, gh, voet, niveau0, s0), x = voet.x + gw * 0.56f;
+            float s = s0 * Mathf.Sqrt(Mathf.Max(0f, 1f - gesmolten));
+            double deel = Drijven.DeelOnder(rhoIjs, rhoVloeistof);
+            bool zinkt = !Drijven.Drijft(rhoIjs, rhoVloeistof);
             void Zet(TextMeshProUGUI l, float y)
             {
                 if (l == null) return;
@@ -86,8 +118,8 @@ namespace WaterSim.UI
                 l.rectTransform.pivot = new Vector2(0f, 0.5f);
                 l.rectTransform.anchoredPosition = new Vector2(x - r.xMin, y - r.yMin);
             }
-            Zet(lBoven, niveau + Mathf.Max(8f, (1f - deelOnder) * s * 0.5f) + 4f);
-            Zet(lOnder, zinkt ? voet.y + s * 0.5f : niveau - deelOnder * s * 0.5f);
+            Zet(lBoven, niveau + Mathf.Max(8f, (1f - (float)deel) * s * 0.5f) + 4f);
+            Zet(lOnder, zinkt ? voet.y + s * 0.5f : niveau - (float)deel * s * 0.5f);
         }
 
         static void Vierhoek(VertexHelper vh, Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color k)
@@ -231,6 +263,7 @@ namespace WaterSim.UI
         public readonly List<(TextMeshProUGUI t, float diepte)> diepteLabels = new List<(TextMeshProUGUI, float)>();
         public Color koud = new Color(0.6f, 0.85f, 0.95f, 1f), vier = new Color(0.04f, 0.22f, 0.4f, 1f), warm = new Color(0.12f, 0.45f, 0.42f, 1f);
         public Color ijsKleur = new Color(0.9f, 0.97f, 1f, 0.95f), bodem = new Color(0.23f, 0.16f, 0.11f, 1f), vis = new Color(1f, 0.6f, 0.4f, 1f);
+        public Color smeltwater = new Color(0.45f, 0.78f, 0.95f, 0.95f), zon = new Color(1f, 0.85f, 0.35f, 1f);
 
         void Update() { SetVerticesDirty(); PlaatsLabels(); }
 
@@ -266,8 +299,23 @@ namespace WaterSim.UI
             {
                 Blok(vh, x0, boven - 0.92f * d, x1, boven + 0.08f * d, ijsKleur);
                 Tekenhulp.Lijn(vh, new Vector2(x0, boven - 0.92f * d), new Vector2(x1, boven - 0.92f * d), 1f, new Color(0.7f, 0.85f, 0.95f, 1f));
+                // smeltwater op het ijs (dooi): dun blauw laagje, iets aangedikt zodat je het ziet
+                if (meer.Smeltwater > 0.0005)
+                {
+                    float sw = Mathf.Clamp((float)meer.Smeltwater * schaal * 3f, 2f, 7f);
+                    Blok(vh, x0, boven + 0.08f * d, x1, boven + 0.08f * d + sw, smeltwater);
+                }
             }
             else Tekenhulp.Lijn(vh, new Vector2(x0, boven), new Vector2(x1, boven), 2f, new Color(0.65f, 0.9f, 0.97f, 1f));
+            // zon: groter en feller bij meer zonlicht
+            if (meer.Zon > 1)
+            {
+                float zr = Mathf.Lerp(7f, 15f, Mathf.Clamp01((float)meer.Zon / 230f));
+                var zm = new Vector2(x1 - 22f, r.yMax - 18f);
+                var zk = zon; zk.a = Mathf.Lerp(0.5f, 1f, Mathf.Clamp01((float)meer.Zon / 230f));
+                Tekenhulp.Schijf(vh, zm, zr, zk, 24);
+            }
+
             // bodem (golvend) en een vis vlak boven de bodem
             var golf = new List<Vector2>();
             for (int k = 0; k <= 24; k++)

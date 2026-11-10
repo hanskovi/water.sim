@@ -851,11 +851,18 @@ namespace WaterSim.UI
         int macroModus;              // 0 = glas, 1 = meer
         int vloeistofKeuze;          // 0 = zoet water, 1 = zeewater, 2 = alcohol
         float luchtT = -5f;
+        bool metZon, jaarModus, opRots, aanHetSmelten;
+        float gesmolten;
+        double startDag;                           // dag van het jaar bij de start (jaar-modus: 1 oktober)
+        const float ZonHandmatig = 150f;           // W/m², zonlicht als de zon aan staat zonder jaar-modus
+        TextMeshProUGUI tSchaats, tSmeltKnop;
+        Image schaatsPil;
         Glasweergave glasW;
         Meerweergave meerW;
         Slider luchtSchuif;
         TextMeshProUGUI tLucht, tMeerStatus, tGlasStatus;
         const float DagenPerSeconde = 1f;          // model: 1 seconde = 1 dag
+        const float DagenPerSecondeJaar = 3f;      // jaar-modus: 1 seconde = 3 dagen (een jaar in ruim 2 minuten)
 
         static double DichtheidVloeistof(int k) => k == 1 ? WaterSim.Sim.Constanten.DichtheidZeewater
                                                  : k == 2 ? WaterSim.Sim.Constanten.DichtheidEthanol
@@ -932,14 +939,44 @@ namespace WaterSim.UI
                 for (int i = 0; i < 3; i++)
                 {
                     int k = i;
-                    var p = Pilknop(r.transform, Teksten.T("vloeistof." + i), () => { vloeistofKeuze = k; PlayerPrefs.SetInt("watersim.vloeistof", k); });
+                    var p = Pilknop(r.transform, Teksten.T("vloeistof." + i), () => { vloeistofKeuze = k; PlayerPrefs.SetInt("watersim.vloeistof", k); gesmolten = 0f; aanHetSmelten = false; });
                     p.t.fontSize = 12.5f;
                     schakelaars.Add((p.img, p.t, () => vloeistofKeuze == k));
                 }
+                var r2 = Rij(paneel.transform, "IJs", 34f, 6f);
+                for (int i = 0; i < 2; i++)
+                {
+                    bool rots = i == 1;
+                    var p = Pilknop(r2.transform, Teksten.T(rots ? "glas.rots" : "glas.drijvend"), () => { opRots = rots; gesmolten = 0f; aanHetSmelten = false; });
+                    p.t.fontSize = 12.5f;
+                    schakelaars.Add((p.img, p.t, () => opRots == rots));
+                }
+                var sm = Pilknop(r2.transform, "", () =>
+                {
+                    if (gesmolten >= 1f || aanHetSmelten) { gesmolten = 0f; aanHetSmelten = false; }
+                    else aanHetSmelten = true;
+                });
+                sm.t.fontSize = 12.5f;
+                tSmeltKnop = sm.t;
+                schakelaars.Add((sm.img, sm.t, () => aanHetSmelten));
                 tGlasStatus = Tekst(paneel.transform, "Status", "", 13f, IJsTekst, TextAlignmentOptions.Left, false, true);
             }
             else
             {
+                var rk = Rij(paneel.transform, "Knoppen", 34f, 6f);
+                var zon = Pilknop(rk.transform, Teksten.T("zon"), () => metZon = !metZon);
+                schakelaars.Add((zon.img, zon.t, () => metZon));
+                var jaar = Pilknop(rk.transform, Teksten.T("jaar"), () =>
+                {
+                    jaarModus = !jaarModus;
+                    meer = new WaterSim.Sim.Meer(24, 6, 12);
+                    startDag = jaarModus ? 274 : 0;                  // jaar begint op 1 oktober
+                    if (jaarModus) metZon = true;
+                    if (meerW != null) meerW.meer = meer;
+                });
+                schakelaars.Add((jaar.img, jaar.t, () => jaarModus));
+                var opn = Pilknop(rk.transform, Teksten.T("opnieuw"), () => { meer = new WaterSim.Sim.Meer(24, 6, 12); if (meerW != null) meerW.meer = meer; });
+
                 var r = Rij(paneel.transform, "Lucht", 34f, 10f);
                 var lab = Tekst(r.transform, "Label", Teksten.T("lucht"), 13.5f, Color.white);
                 LE(lab.gameObject, prefW: 52f);
@@ -965,11 +1002,14 @@ namespace WaterSim.UI
                 LE(w.gameObject, prefW: 58f);
                 tLuchtWaarde = w;
 
-                var r2 = Rij(paneel.transform, "Meerstatus", 30f, 8f);
+                var r2 = Rij(paneel.transform, "Meerstatus", 26f, 8f);
                 tMeerStatus = Tekst(r2.transform, "Status", "", 13f, IJsTekst);
                 LE(tMeerStatus.gameObject, flexW: 1f);
-                var opn = Pilknop(r2.transform, Teksten.T("opnieuw"), () => meer = new WaterSim.Sim.Meer(24, 6, 12), 0f);
-                LE(opn.img.gameObject, prefW: 96f);
+                // schaatsmeter: kun je erop?
+                schaatsPil = Vlak(r2.transform, "Schaatsen", Color.white, 8f);
+                LE(schaatsPil.gameObject, prefW: 150f);
+                tSchaats = Tekst(schaatsPil.transform, "Tekst", "", 12f, Color.white, TextAlignmentOptions.Center, true);
+                Vul(tSchaats.rectTransform, 6, 0, 6, 0);
             }
             var noot = Tekst(paneel.transform, "Model", Teksten.T(macroModus == 0 ? "model.glas" : "model.meer"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
             LE(noot.gameObject, prefH: 28f);
@@ -977,23 +1017,49 @@ namespace WaterSim.UI
 
         TextMeshProUGUI tLuchtWaarde;
 
+        // "15 jan" uit de dag van het jaar (0 = 1 januari)
+        static string Datum(double dag)
+        {
+            int m = WaterSim.Sim.Seizoen.Maand(dag);
+            int[] begin = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
+            int d = (int)(dag - begin[m]) + 1;
+            return d + " " + Teksten.T("maand." + m);
+        }
+
         void WerkMacroBij()
         {
             if (macroModus == 0 && glasW != null)
             {
                 double rhoIjs = WaterSim.Sim.Constanten.DichtheidIjsBinas, rhoV = DichtheidVloeistof(vloeistofKeuze);
                 bool drijft = WaterSim.Sim.Drijven.Drijft(rhoIjs, rhoV);
-                float onder = (float)WaterSim.Sim.Drijven.DeelOnder(rhoIjs, rhoV);
-                glasW.deelOnder = onder; glasW.zinkt = !drijft;
+                if (aanHetSmelten) { gesmolten = Mathf.Min(1f, gesmolten + Time.deltaTime / 8f); if (gesmolten >= 1f) aanHetSmelten = false; }
+                glasW.rhoIjs = rhoIjs; glasW.rhoVloeistof = rhoV; glasW.rhoSmeltwater = WaterSim.Sim.Constanten.DichtheidWater(0);
+                glasW.opRots = opRots; glasW.gesmolten = gesmolten;
                 glasW.vloeistof = vloeistofKeuze == 2 ? new Color(0.75f, 0.82f, 0.86f, 0.32f) : Lin(Hex(vloeistofKeuze == 1 ? "1A6A8C" : "1E7FA8")) * new Color(1f, 1f, 1f, 0.6f);
-                int pOnder = Mathf.RoundToInt(onder * 100f);
-                glasW.lBoven.text = drijft ? string.Format(Teksten.T("glas.boven"), 100 - pOnder) : "";
-                glasW.lOnder.text = drijft ? string.Format(Teksten.T("glas.onder"), pOnder) : Teksten.T("glas.zinkt");
-                if (tGlasStatus != null) tGlasStatus.text = Teksten.T(drijft ? (vloeistofKeuze == 1 ? "glas.status.zee" : "glas.status.drijft") : "glas.status.zinkt");
+                int pOnder = Mathf.RoundToInt((float)WaterSim.Sim.Drijven.DeelOnder(rhoIjs, rhoV) * 100f);
+                bool labels = !opRots && gesmolten < 0.95f;
+                glasW.lBoven.text = labels && drijft ? string.Format(Teksten.T("glas.boven"), 100 - pOnder) : "";
+                glasW.lOnder.text = !labels ? "" : drijft ? string.Format(Teksten.T("glas.onder"), pOnder) : Teksten.T("glas.zinkt");
+                if (tSmeltKnop != null) tSmeltKnop.text = Teksten.T(gesmolten > 0f ? "opnieuw" : "glas.smelt");
+                if (tGlasStatus != null)
+                {
+                    string sleutel = gesmolten < 1f
+                        ? (opRots ? "glas.status.rots" : drijft ? (vloeistofKeuze == 1 ? "glas.status.zee" : "glas.status.drijft") : "glas.status.zinkt")
+                        : (opRots ? "glas.na.rots" : !drijft ? "glas.na.zinkt" : vloeistofKeuze == 1 ? "glas.na.zee" : "glas.na.zoet");
+                    tGlasStatus.text = Teksten.T(sleutel);
+                }
             }
             else if (macroModus == 1 && meerW != null && meer != null)
             {
-                meer.Stap(Time.deltaTime * DagenPerSeconde * 86400.0, luchtT);
+                double dag = (startDag + meer.Tijd / 86400.0) % WaterSim.Sim.Seizoen.DagenPerJaar;
+                if (jaarModus) luchtT = (float)WaterSim.Sim.Seizoen.Lucht(dag);
+                meer.Zon = !metZon ? 0 : jaarModus ? WaterSim.Sim.Seizoen.Zon(dag) : ZonHandmatig;
+                if (luchtSchuif != null)
+                {
+                    luchtSchuif.interactable = !jaarModus;
+                    luchtSchuif.SetValueWithoutNotify(luchtT);
+                }
+                meer.Stap(Time.deltaTime * (jaarModus ? DagenPerSecondeJaar : DagenPerSeconde) * 86400.0, luchtT);
                 meerW.meer = meer;
                 for (int i = 0; i < meerW.diepteLabels.Count; i++)
                 {
@@ -1001,11 +1067,23 @@ namespace WaterSim.UI
                     int laag = Mathf.Clamp((int)(d / meer.Diepte * meer.Lagen), 0, meer.Lagen - 1);
                     t.text = $"{Teksten.Getal(d, "0.#")} m · <b>{Teksten.Graden(meer.T[laag], 1)}</b>";
                 }
-                meerW.lIjs.text = meer.Ijsdikte > 0.003 ? string.Format(Teksten.T("meer.ijs"), Teksten.Getal(meer.Ijsdikte * 100, "0")) : "";
+                string waar = meer.IjsRichting > 0 ? Teksten.T("meer.groeit") : meer.IjsRichting < 0 ? Teksten.T("meer.smelt") : "";
+                meerW.lIjs.text = meer.Ijsdikte > 0.003 ? string.Format(Teksten.T("meer.ijs"), Teksten.Getal(meer.Ijsdikte * 100, "0")) + (waar != "" ? " · " + waar : "") : "";
+                // schaatsmeter (richtlijn): < 5 cm niet op, 5–10 één persoon, 10–15 schaatsen, ≥ 15 toertocht
+                double cm = meer.Ijsdikte * 100;
+                if (schaatsPil != null)
+                {
+                    schaatsPil.gameObject.SetActive(cm >= 0.5);
+                    int stap = cm < 5 ? 0 : cm < 10 ? 1 : cm < 15 ? 2 : 3;
+                    tSchaats.text = Teksten.T("schaats." + stap);
+                    schaatsPil.color = Lin(Hex(stap == 0 ? "D9483B" : stap == 1 ? "E8902E" : "3E9E5A"));
+                }
                 if (tLucht != null) tLucht.text = $"{Teksten.T("lucht")} {Teksten.Graden(luchtT, 0, true)}";
                 if (tLuchtWaarde != null) tLuchtWaarde.text = Teksten.Graden(luchtT, 0, true);
                 if (tMeerStatus != null)
-                    tMeerStatus.text = string.Format(Teksten.T("meer.status"), (int)(meer.Tijd / 86400.0), Teksten.Graden(meer.Bodem, 1));
+                    tMeerStatus.text = jaarModus
+                        ? string.Format(Teksten.T("meer.status.jaar"), Datum(dag), Teksten.Graden(meer.Bodem, 1))
+                        : string.Format(Teksten.T("meer.status"), (int)(meer.Tijd / 86400.0), Teksten.Graden(meer.Bodem, 1));
             }
         }
 
