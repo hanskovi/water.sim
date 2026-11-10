@@ -1129,7 +1129,7 @@ namespace WaterSim.UI
                 {
                     var (t, d) = meerW.diepteLabels[i];
                     int laag = Mathf.Clamp((int)(d / meer.Diepte * meer.Lagen), 0, meer.Lagen - 1);
-                    t.text = $"{Teksten.Getal(d, "0.#")} m · <b>{Teksten.Graden(meer.T[laag], 1)}</b>";
+                    t.text = $"{Teksten.Getal(d, "0.#")} m: <b>{Teksten.Graden(meer.T[laag], 1)}</b>";
                 }
                 // wat er netto met het ijs gebeurt (gemiddeld over een dag), met de snelheid
                 var tst = meer.Toestand;
@@ -1153,7 +1153,7 @@ namespace WaterSim.UI
                 if (tLucht != null)
                     tLucht.text = $"{Teksten.T("lucht")} {Teksten.Graden(luchtT, 0, true)}\n<size=75%><color=#B9DCEA>" +
                                   (jaarModus ? Datum(dag) : $"{Teksten.T("dag.hoofd")} {(int)(meer.Tijd / 86400.0)}") + "</color></size>";
-                if (meerW.lBodem != null) meerW.lBodem.text = $"{Teksten.T("bodem")} <b>{Teksten.Graden(meer.Bodem, 1)}</b>";
+                if (meerW.lBodem != null) meerW.lBodem.text = $"{Teksten.T("bodem")}: <b>{Teksten.Graden(meer.Bodem, 1)}</b>";
                 if (tLuchtWaarde != null) tLuchtWaarde.text = Teksten.Graden(luchtT, 0, true);
                 if (tMeerStatus != null)
                     tMeerStatus.text = meer.Ijsdikte > 0.003 ? string.Format(Teksten.T("meer.ijsstatus"), Teksten.Getal(meer.Ijsdikte * 100, "0")) : Teksten.T("meer.geenijs");

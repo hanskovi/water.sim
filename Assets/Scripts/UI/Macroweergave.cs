@@ -269,9 +269,93 @@ namespace WaterSim.UI
 
         void Maten(Rect r, out float boven, out float onder, out float schaal)
         {
-            boven = r.yMax - Mathf.Max(r.height * 0.42f, 175f);   // bovenin ruimte voor lucht en datum, zon, ijslabel en formulekaartje
+            boven = r.yMax - Mathf.Max(r.height * 0.46f, 195f);   // bovenin ruimte voor lucht en datum, zon, ijslabel, schaatsers en formulekaartje
             onder = r.yMin + r.height * 0.05f;
             schaal = meer != null ? (boven - onder) / (float)meer.Diepte : 1f;
+        }
+
+        // ---------- schaatsers ----------
+        const float Schaatsruimte = 24f;          // hoogte boven het ijs voor de schaatsers (het ijslabel staat erboven)
+        const int MaxSchaatsers = 10;
+        readonly float[] zicht = new float[MaxSchaatsers];
+        float laatsteTijd;
+
+        /// <summary>
+        /// Schaatsers volgens de schaatsmeter: &lt; 5 cm niemand (bordje), 5–10 cm één voorzichtige schaatser,
+        /// 10–15 cm een paar, vanaf 15 cm een toertocht in een lint. Smelt het ijs, dan gaat iedereen eraf.
+        /// </summary>
+        void Schaatsers(VertexHelper vh, float x0, float x1, float ijs, float t)
+        {
+            float dt = Mathf.Clamp(t - laatsteTijd, 0f, 0.1f); laatsteTijd = t;
+            double cm = meer.Ijsdikte * 100;
+            var tst = meer.Toestand;
+            bool smelt = meer.Smeltwater > 0.0005 || tst == Meer.IJstoestand.SmeltBoven || tst == Meer.IJstoestand.SmeltOnder || tst == Meer.IJstoestand.SmeltBeide;
+            bool toertocht = cm >= 15 && !smelt;
+            int aantal = smelt || cm < 5 ? 0 : cm < 10 ? 1 : cm < 15 ? 3 : 9;
+            if (meer.Ijsdikte > 0.003 && (cm < 5 || smelt)) Bordje(vh, new Vector2(x1 - 22f, ijs));
+            float breed = x1 - x0;
+            for (int i = 0; i < MaxSchaatsers; i++)
+            {
+                zicht[i] = Mathf.MoveTowards(zicht[i], i < aantal ? 1f : 0f, dt * 1.5f);   // rustig het ijs op en af
+                if (zicht[i] <= 0.01f) continue;
+                float x; int kant;
+                if (toertocht)
+                {
+                    // lint achter elkaar, van links naar rechts, rond
+                    float lus = breed + 60f;
+                    x = x0 - 30f + Mathf.Repeat(t * 26f + (MaxSchaatsers - i) * 17f, lus);
+                    kant = 1;
+                }
+                else
+                {
+                    // heen en weer, elk in zijn eigen tempo; de eerste (op dun ijs) heel voorzichtig
+                    float v = aantal == 1 ? 10f : 16f + 6f * i, L = breed - 60f;
+                    float f = Mathf.PingPong(t * v / L + i * 0.37f, 1f);
+                    x = x0 + 30f + f * L;
+                    kant = Mathf.PingPong(t * v / L + i * 0.37f + 0.001f, 1f) > f ? 1 : -1;
+                }
+                if (x < x0 + 6f || x > x1 - 6f) continue;
+                Schaatser(vh, new Vector2(x, ijs), kant, t * (toertocht ? 3.2f : 2.6f) + i * 1.3f, toertocht, zicht[i], toertocht && i == 0);
+            }
+        }
+
+        // plat figuurtje in de stijl van de vis: voorovergebogen, om en om afzetten
+        void Schaatser(VertexHelper vh, Vector2 voet, int kant, float fase, bool handenOpRug, float zichtbaar, bool vlag)
+        {
+            var k = vis; k.a *= zichtbaar;
+            var ijzer = new Color(0.1f, 0.15f, 0.2f, zichtbaar);
+            float s = Mathf.Sin(fase);
+            var heup = voet + new Vector2(kant * 1f, 9f);
+            var voor = voet + new Vector2(kant * (2f + 3f * s), 0f);
+            var achter = voet + new Vector2(-kant * (4f + 3f * s), 1.5f * Mathf.Max(0f, -s) + 0.5f);
+            var schouder = heup + new Vector2(kant * 5f, 5.5f);
+            Tekenhulp.Lijn(vh, voor + new Vector2(-4f, -0.8f), voor + new Vector2(4f, -0.8f), 1.2f, ijzer);   // ijzers
+            Tekenhulp.Lijn(vh, achter + new Vector2(-4f, -0.8f), achter + new Vector2(4f, -0.8f), 1.2f, ijzer);
+            Tekenhulp.Lijnstuk(vh, new[] { voor, heup, achter }, 2.2f, k, true);                                   // benen
+            Tekenhulp.Lijnstuk(vh, new[] { heup, schouder }, 2.8f, k, true);                                      // romp
+            Tekenhulp.Schijf(vh, schouder + new Vector2(kant * 2.4f, 3.2f), 2.6f, k, 12);                        // hoofd
+            var hand = handenOpRug ? heup + new Vector2(-kant * 1.5f, 2.5f) : schouder + new Vector2(-kant * 5f * s, -4.5f);
+            Tekenhulp.Lijnstuk(vh, new[] { schouder, hand }, 1.8f, k, true);                                      // arm
+            if (vlag)
+            {
+                var stok = schouder + new Vector2(kant * 1f, 0f);
+                Tekenhulp.Lijn(vh, stok, stok + new Vector2(0f, 12f), 1f, ijzer);
+                var w = new Color(1f, 1f, 1f, zichtbaar);
+                int i = vh.currentVertCount;
+                vh.AddVert(stok + new Vector2(0f, 12f), w, Vector4.zero); vh.AddVert(stok + new Vector2(-kant * 8f, 10f), w, Vector4.zero); vh.AddVert(stok + new Vector2(0f, 8f), w, Vector4.zero);
+                vh.AddTriangle(i, i + 1, i + 2);
+            }
+        }
+
+        // verbodsbord aan de kant: rode rand, witte balk
+        void Bordje(VertexHelper vh, Vector2 voet)
+        {
+            var paal = new Color(0.85f, 0.88f, 0.9f, 1f);
+            Tekenhulp.Lijn(vh, voet, voet + new Vector2(0f, 14f), 1.6f, paal);
+            var m = voet + new Vector2(0f, 20f);
+            Tekenhulp.Schijf(vh, m, 7f, new Color(0.85f, 0.2f, 0.17f, 1f), 18);
+            Tekenhulp.Schijf(vh, m, 5f, Color.white, 18);
+            Tekenhulp.Lijn(vh, m + new Vector2(-3.5f, 0f), m + new Vector2(3.5f, 0f), 2.2f, new Color(0.85f, 0.2f, 0.17f, 1f));
         }
 
         // bovenkant van het ijs plus het smeltwater (waar het ijslabel op staat)
@@ -329,13 +413,14 @@ namespace WaterSim.UI
                 }
             }
             else Tekenhulp.Lijn(vh, new Vector2(x0, boven), new Vector2(x1, boven), 2f, new Color(0.65f, 0.9f, 0.97f, 1f));
+            Schaatsers(vh, x0, x1, IjsTop(boven, schaal), Time.time);
             float t = Time.time;
             // zon: groter en feller bij meer zonlicht
             if (meer.Zon > 1)
             {
                 // tussen de tekst linksboven (lucht, datum) en het ijslabel boven het water
                 float sterkte = Mathf.Clamp01((float)meer.Zon / 230f);
-                float bovengrens = r.yMax - 54f, ondergrens = IjsTop(boven, schaal) + 46f;
+                float bovengrens = r.yMax - 54f, ondergrens = IjsTop(boven, schaal) + Schaatsruimte + 42f;
                 float ruimte = Mathf.Max(20f, (bovengrens - ondergrens) * 0.5f);
                 var zm = new Vector2(x0 + 56f, (bovengrens + ondergrens) * 0.5f);
                 float schijf = Mathf.Clamp(ruimte * 0.32f, 8f, 16f) * Mathf.Lerp(0.75f, 1f, sterkte);
@@ -394,7 +479,7 @@ namespace WaterSim.UI
                 lIjs.rectTransform.anchorMin = lIjs.rectTransform.anchorMax = Vector2.zero;
                 lIjs.rectTransform.pivot = new Vector2(0f, 0f);
                 lIjs.rectTransform.sizeDelta = new Vector2(Mathf.Max(60f, r.width - 24f), 40f);
-                lIjs.rectTransform.anchoredPosition = new Vector2(12f, IjsTop(boven, schaal) + 5f - r.yMin);
+                lIjs.rectTransform.anchoredPosition = new Vector2(12f, IjsTop(boven, schaal) + Schaatsruimte + 4f - r.yMin);
             }
         }
 

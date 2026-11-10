@@ -175,7 +175,7 @@ namespace WaterSim.UI
             ["maand.9"] = ("okt", "Oct"),
             ["maand.10"] = ("nov", "Nov"),
             ["maand.11"] = ("dec", "Dec"),
-            ["meer"] = ("Meer", "Lake"),
+            ["meer"] = ("Meertje", "Pond"),
             ["vloeistof.0"] = ("Zoet water", "Fresh water"),
             ["vloeistof.1"] = ("Zeewater", "Sea water"),
             ["vloeistof.2"] = ("Alcohol", "Alcohol"),
