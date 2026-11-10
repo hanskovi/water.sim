@@ -194,6 +194,14 @@ namespace WaterSim.UI
             verloopOnder.rectTransform.localScale = new Vector3(1f, -1f, 1f);       // gespiegeld: donker onderaan
 
             veilig = Maak("VeiligeZone", go.transform);
+            if (Debug.isDebugBuild)
+            {
+                // alleen in de editor en testbuilds: laat zien waar de banner komt
+                bannerPlek = Vlak(veilig, "Bannerplek", new Color(0f, 0f, 0f, 0.55f));
+                bannerPlek.raycastTarget = false;
+                var bt = Tekst(bannerPlek.transform, "Tekst", "advertentie (banner)", 11f, new Color(1f, 1f, 1f, 0.6f), TextAlignmentOptions.Center);
+                Vul(bt.rectTransform);
+            }
             kolom = Maak("Kolom", veilig);
             startPagina = Maak("Startscherm", kolom); Vul(startPagina);
             simPagina = Maak("Simulatie", kolom); Vul(simPagina);
@@ -229,6 +237,25 @@ namespace WaterSim.UI
 
         // Kolombreedte op de echte (geschaalde) breedte van de veilige zone. Bij het opstarten heeft Unity het canvas
         // nog niet geschaald (dan meldt het pixels i.p.v. eenheden); daarom wordt dit elk beeld gecontroleerd.
+        // ---------- banneradvertentie ----------
+        // Onderaan elke pagina blijft een strook vrij voor een banner (telefoon 50, tablet 90 punten). Zodra de
+        // advertentie-SDK erin zit, zet die met ZetBannerHoogte de echte hoogte (in pixels).
+        float bannerPixels = -1f;
+        Image bannerPlek;
+        public void ZetBannerHoogte(float pixels) { bannerPixels = pixels; kolomBreedte = -1f; }
+        float BannerHoogte()
+        {
+            float schaal = CanvasSchaal();
+            if (bannerPixels >= 0f) return bannerPixels / schaal;
+            bool tablet = Mathf.Min(Screen.width, Screen.height) / Mathf.Max(1f, Screen.dpi > 0 ? Screen.dpi / 160f : 2f) >= 600f;
+            return tablet ? 90f : 50f;
+        }
+        float CanvasSchaal()
+        {
+            var r = schaler.referenceResolution;
+            return Mathf.Pow(2f, Mathf.Lerp(Mathf.Log(Screen.width / r.x, 2f), Mathf.Log(Screen.height / r.y, 2f), schaler.matchWidthOrHeight));
+        }
+
         const float SchaalBreedteTot = 0.5f, SchaalHoogteVanaf = 0.62f;
         // Op tablets wordt de kolom breder (max 580) zodat het lijkt op de telefoon; de tegels worden breder,
         // maar niet hoger dan TegelMaxHoogte, anders past de inhoud niet meer boven de golf.
@@ -241,14 +268,18 @@ namespace WaterSim.UI
             // breedte van de veilige zone in canvas-eenheden, zelf uitgerekend zoals de CanvasScaler dat doet
             // (logaritmisch mengen van breedte en hoogte). Unity schaalt het canvas pas een beeld later; met
             // veilig.rect zou het eerste beeld in pixels rekenen en de kolom even verkeerd staan.
-            var r = schaler.referenceResolution;
-            float schaal = Mathf.Pow(2f, Mathf.Lerp(Mathf.Log(Screen.width / r.x, 2f), Mathf.Log(Screen.height / r.y, 2f), schaler.matchWidthOrHeight));
-            float w = Screen.safeArea.width / schaal;
+            float w = Screen.safeArea.width / CanvasSchaal();
             if (w <= 0f || Mathf.Abs(w - kolomBreedte) < 0.5f) return;
             kolomBreedte = w;
             float zij = Mathf.Max(MinZij, (w - MaxKolom) / 2f);         // smal scherm: kleine marge; breed: kolom van 580
-            kolom.offsetMin = new Vector2(zij, 0f);
+            kolom.offsetMin = new Vector2(zij, BannerHoogte());
             kolom.offsetMax = new Vector2(-zij, 0f);
+            if (bannerPlek != null)
+            {
+                var b = bannerPlek.rectTransform;
+                b.anchorMin = Vector2.zero; b.anchorMax = new Vector2(1f, 0f); b.pivot = new Vector2(0.5f, 0f);
+                b.anchoredPosition = Vector2.zero; b.sizeDelta = new Vector2(0f, BannerHoogte());
+            }
             if (levelRaster != null)
             {
                 float binnen = w - 2f * zij - 2f * Binnenmarge;
@@ -1758,7 +1789,7 @@ namespace WaterSim.UI
             vrijRt.GetWorldCorners(vrijHoeken);                   // overlay-canvas: wereld = schermpixels
             float s = canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
             float onder = vrijHoeken[0].y / s, boven = vrijHoeken[1].y / s, H = Screen.height / s, W = Screen.width / s;
-            float zachtBoven = (boven - onder) * 0.13f, zachtOnder = (boven - onder) * 0.18f;   // alleen een smalle rand wordt donker
+            float zachtBoven = (boven - onder) * 0.13f;           // boven wordt alleen een smalle rand donker
             void Zet(Image img, float y0, float y1)
             {
                 var rt = img.rectTransform;
@@ -1768,11 +1799,11 @@ namespace WaterSim.UI
             }
             Zet(dekBoven, boven, H);                              // achter de bovenbalk: dekkend
             Zet(verloopBoven, boven - zachtBoven, boven);         // daaronder: van donker naar helder
-            Zet(dekOnder, 0f, onder);                             // achter het paneel: dekkend
+            Zet(dekOnder, 0f, 0f);                                // onder geen dekkende strook: het 3D-beeld mag onder het paneel door schemeren
             var o = verloopOnder.rectTransform;                   // gespiegeld (schaal −1): pivot boven = onderkant in beeld
             o.pivot = new Vector2(0f, 1f);
-            o.anchoredPosition = new Vector2(0f, onder);
-            o.sizeDelta = new Vector2(W, zachtOnder);
+            o.anchoredPosition = new Vector2(0f, 0f);
+            o.sizeDelta = new Vector2(W, onder);                  // van echt donker op de bodem tot doorzichtig net bij de rand van het paneel
         }
         readonly Vector3[] vrijHoeken = new Vector3[4];
 

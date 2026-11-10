@@ -116,14 +116,16 @@ namespace WaterSim.Weergave
                 var draai = Quaternion.Euler(4f * w * Mathf.Sin(t * 0.7f), 8f * w * Mathf.Sin(t * 0.45f), 3f * w * Mathf.Sin(t * 0.9f));
                 var m = Maak(Vector3.zero, draai * Vector3.down, draai * Vector3.right, 1f + 0.015f * w * Mathf.Sin(t * 6f));
                 Teken(m);
-                if (!kalotten)
+                if (toonLadingen)
                 {
+                    // gradenboog van het midden van het ene H-atoom naar het andere, met het aantal graden er vlak onder;
+                    // hoort bij de "uitleg"-laag: verdwijnt samen met de δ's
                     toonHoek = true;
                     Hoek2D(m);
                     var bis = ((m.h1 + m.h2) * 0.5f - m.o).normalized;
-                    Label(ref lab, m.o + bis * (OH + 0.45f), Hoektekst(), Color.white, 14f);
+                    Label(ref lab, m.o + bis * (OH + 0.28f), Hoektekst(), Color.white, 14f);   // net onder het midden van de boog
+                    Ladingen(ref lab, m, rO, rH);
                 }
-                if (toonLadingen) Ladingen(ref lab, m, rO, rH);
             }
             else
             {
@@ -220,11 +222,11 @@ namespace WaterSim.Weergave
         {
             if (boog2D == null) return;
             var a = (m.h1 - m.o).normalized; var b = (m.h2 - m.o).normalized;
-            const int stukken = 32; const float straal = 0.78f;             // net binnen de H-atomen (die beginnen op ≈ 0,76 Å)
+            const int stukken = 32; float straal = OH;                       // door het midden van beide H-atomen
             boogPunten.Clear();
             for (int k = 0; k <= stukken; k++)
             {
-                var p = cam.WorldToScreenPoint(m.o + Vector3.Slerp(a, b, Mathf.Lerp(0.06f, 0.94f, k / (float)stukken)) * straal);
+                var p = cam.WorldToScreenPoint(m.o + Vector3.Slerp(a, b, k / (float)stukken) * straal);
                 if (p.z <= 0f) { boog2D.Zet(null); return; }
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(boog2D.rectTransform, p, null, out var lok)) boogPunten.Add(lok);
             }
