@@ -903,7 +903,7 @@ namespace WaterSim.UI
             {
                 poolW = vlak.gameObject.AddComponent<Poolweergave>();
                 poolW.raycastTarget = false;
-                poolW.zee = Lin(Hex("145E8A")) * new Color(1f, 1f, 1f, 0.9f); poolW.land = Lin(Hex("5C4A3A")); poolW.ijs = Lin(Hex("E8F7FF"));
+                poolW.zee = Lin(Hex("145E8A")) * new Color(1f, 1f, 1f, 0.9f); poolW.land = Lin(Hex("8A7058")); poolW.ijs = Lin(Hex("E8F7FF"));
                 poolW.lLand = Tekst(vlak, "Land", Teksten.T("pool.land"), 12f, Color.white, TextAlignmentOptions.Center, true);
                 poolW.lZee = Tekst(vlak, "Zee", Teksten.T("pool.zee"), 12f, Color.white, TextAlignmentOptions.Center, true);
                 poolW.lStijging = Tekst(vlak, "Stijging", "", 12f, Lin(Hex("FFB48A")), TextAlignmentOptions.Right, true);

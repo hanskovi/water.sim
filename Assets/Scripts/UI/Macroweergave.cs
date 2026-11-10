@@ -358,6 +358,12 @@ namespace WaterSim.UI
                 t.rectTransform.anchorMin = t.rectTransform.anchorMax = Vector2.zero;
                 t.rectTransform.pivot = new Vector2(1f, 0.5f);
                 t.rectTransform.anchoredPosition = new Vector2(r.width - 12f, boven - diepte * schaal - r.yMin);
+                // tekstkleur volgens de achtergrond: donkere tekst op licht ijs of koud (licht) water, anders wit
+                Color achter = diepte < 0.92 * meer.Ijsdikte ? ijsKleur
+                             : Kleur(meer.T[Mathf.Clamp((int)(diepte / meer.Diepte * meer.Lagen), 0, meer.Lagen - 1)]);
+                bool licht = 0.2126f * achter.r + 0.7152f * achter.g + 0.0722f * achter.b > 0.35f;
+                t.color = licht ? new Color(0.02f, 0.09f, 0.15f, 1f) : Color.white;
+                t.outlineColor = licht ? new Color32(235, 248, 255, 200) : new Color32(4, 16, 26, 230);
             }
             if (lIjs != null)
             {
@@ -455,7 +461,7 @@ namespace WaterSim.UI
                 for (int i = 0; i <= 24; i++)
                 {
                     float f = i / 24f;
-                    k.Add(new Vector2(Mathf.Lerp(a, b, f), landTop + koepel * Mathf.Pow(Mathf.Sin(f * Mathf.PI), 0.6f)));
+                    k.Add(new Vector2(Mathf.Lerp(a, b, f), landTop + koepel * Mathf.Pow(Mathf.Max(0f, Mathf.Sin(f * Mathf.PI)), 0.6f)));
                 }
                 k.Add(new Vector2(b, landTop)); k.Add(new Vector2(a, landTop));
                 Veelhoek(vh, k, ijs);
