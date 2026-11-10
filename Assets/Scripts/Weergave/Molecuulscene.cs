@@ -33,7 +33,7 @@ namespace WaterSim.Weergave
         readonly List<Matrix4x4> mO = new List<Matrix4x4>(), mH = new List<Matrix4x4>(), mS = new List<Matrix4x4>();
         readonly List<Matrix4x4> mB = new List<Matrix4x4>(), mBK = new List<Matrix4x4>(), mBoog = new List<Matrix4x4>();
         readonly List<TextMeshProUGUI> labels = new List<TextMeshProUGUI>();
-        Material brugMat, kernMat, vlakMat, randMat;
+        Material brugMat, kernMat, vlakMat, randMat, boogMat;
         Color brugKleur, kernKleur;
         Mesh hoekvlak;
         Canvas labelDoek;
@@ -57,6 +57,12 @@ namespace WaterSim.Weergave
                 randMat = new Material(bron.brug) { name = "Hoekrand" };
                 randMat.SetColor("_BaseColor", new Color(0.9f, 0.96f, 1f, 0.9f));
             }
+            if (boogMat == null && bron.staaf != null)
+            {
+                // de boog zelf: niet doorzichtig (zelfde soort materiaal als de staafjes), lichtblauw, dus altijd zichtbaar
+                boogMat = new Material(bron.staaf) { name = "Hoekboog" };
+                boogMat.SetColor("_BaseColor", new Color(0.55f, 0.82f, 1f, 1f));
+            }
             if (hoekvlak == null) hoekvlak = new Mesh { name = "Hoekvlak" };
             if (labelDoek == null)
             {
@@ -76,7 +82,7 @@ namespace WaterSim.Weergave
 
         void OnDestroy()
         {
-            foreach (var m in new[] { brugMat, kernMat, vlakMat, randMat }) if (m != null) Destroy(m);
+            foreach (var m in new[] { brugMat, kernMat, vlakMat, randMat, boogMat }) if (m != null) Destroy(m);
             if (hoekvlak != null) Destroy(hoekvlak);
         }
 
@@ -159,8 +165,8 @@ namespace WaterSim.Weergave
                 }
                 if (toonHoek && vlakMat != null)
                 {
-                    Graphics.RenderMesh(new RenderParams(vlakMat) { shadowCastingMode = ShadowCastingMode.Off }, hoekvlak, 0, Matrix4x4.identity);
-                    Teken(bron.cilinder, randMat, mBoog);
+                    Graphics.RenderMesh(new RenderParams(vlakMat) { shadowCastingMode = ShadowCastingMode.Off, worldBounds = new Bounds(Vector3.zero, Vector3.one * 1000f) }, hoekvlak, 0, Matrix4x4.identity);
+                    Teken(bron.cilinder, boogMat != null ? boogMat : randMat, mBoog);
                 }
             }
         }
@@ -202,11 +208,11 @@ namespace WaterSim.Weergave
             }
         }
 
-        // taartpunt tussen de twee O–H-bindingen (dubbelzijdig) met een heldere boogrand, zoals in het schoolboek
+        // taartpunt tussen de twee O–H-bindingen (dubbelzijdig) met een heldere boog die van H-atoom naar H-atoom loopt
         void Hoek(Mol m)
         {
             var a = (m.h1 - m.o).normalized; var b = (m.h2 - m.o).normalized;
-            const int stukken = 20; const float straal = 0.62f;
+            const int stukken = 24; const float straal = 0.78f;            // net binnen de H-atomen (die beginnen op ≈ 0,76 Å)
             var v = new List<Vector3> { m.o };
             for (int k = 0; k <= stukken; k++) v.Add(m.o + Vector3.Slerp(a, b, k / (float)stukken) * straal);
             var d = new List<int>();
@@ -215,7 +221,7 @@ namespace WaterSim.Weergave
             hoekvlak.SetVertices(v);
             hoekvlak.SetTriangles(d, 0);
             hoekvlak.RecalculateBounds();
-            for (int k = 1; k <= stukken; k++) mBoog.Add(Staaf(v[k], v[k + 1], 0.022f));
+            for (int k = 1; k <= stukken; k++) mBoog.Add(Staaf(v[k], v[k + 1], 0.035f));
         }
 
         static string Hoektekst() => ((float)Constanten.HoekHOH).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
