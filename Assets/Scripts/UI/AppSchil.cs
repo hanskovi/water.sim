@@ -734,7 +734,7 @@ namespace WaterSim.UI
         void Infovak(RectTransform vrij)
         {
             infoTabs.Clear();
-            infoNiveau = Mathf.Clamp(PlayerPrefs.GetInt("watersim.infoniveau", league), 0, 2);
+            infoNiveau = Mathf.Clamp(PlayerPrefs.GetInt("watersim.infoniveau", league), 0, 3);
             var kleur = Lin(Hex("05293A")); kleur.a = 0.9f;
             infoVak = Vlak(vrij, "Infovak", kleur, 14f);
             Vul(infoVak.rectTransform, 0f, 6f, 0f, 6f);
@@ -758,10 +758,10 @@ namespace WaterSim.UI
 
             // niveaus
             var tabs = Rij(infoVak.transform, "Niveaus", 30f, 6f);
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 4; i++)                     // onderbouw · bovenbouw · XPRT · Model
             {
                 int n = i;
-                var p = Pilknop(tabs.transform, Teksten.T("league." + i), () => { infoNiveau = n; PlayerPrefs.SetInt("watersim.infoniveau", n); VulInfo(); });
+                var p = Pilknop(tabs.transform, Teksten.T(i < 3 ? "league." + i : "info.model"), () => { infoNiveau = n; PlayerPrefs.SetInt("watersim.infoniveau", n); VulInfo(); }, i < 3 ? 1f : 0.7f);
                 p.t.fontSize = 12.5f;
                 infoTabs.Add((p.img, p.t, n));
             }
@@ -790,7 +790,10 @@ namespace WaterSim.UI
         void VulInfo()
         {
             if (infoTekst == null) return;
-            infoTekst.text = string.Format(Teksten.T($"info.{level + 1}.{infoNiveau}"), InfoGetallen());
+            string sleutel = infoNiveau < 3 ? $"info.{level + 1}.{infoNiveau}"
+                           : MacroLevel ? "info.5.model." + (macroModus == 0 ? "glas" : macroModus == 2 ? "pool" : "meer")
+                           : $"info.{level + 1}.model";
+            infoTekst.text = string.Format(Teksten.T(sleutel), InfoGetallen());
             foreach (var t in infoTabs) Actief(t.img, t.t, t.n == infoNiveau);
         }
 
@@ -830,7 +833,6 @@ namespace WaterSim.UI
             var bw = Pilknop(r.transform, Teksten.T("beweging"), () => kristal.beweging = !kristal.beweging);
             schakelaars.Add((bw.img, bw.t, () => kristal.beweging));
             var noot = Tekst(paneel.transform, "Model", Teksten.T("model.ijs"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
-            LE(noot.gameObject, prefH: 28f);
         }
 
         // naar het vorige of volgende speelbare level (rondlopend), meteen in het simulatiescherm
@@ -1069,7 +1071,6 @@ namespace WaterSim.UI
                 // de ijsdikte en de schaatsers staan in beeld; geen aparte statusregel meer
             }
             var noot = Tekst(paneel.transform, "Model", Teksten.T(macroModus == 0 ? "model.glas" : macroModus == 2 ? "model.pool" : "model.meer"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
-            LE(noot.gameObject, prefH: 28f);
         }
 
         TextMeshProUGUI tLuchtWaarde;
@@ -1241,7 +1242,6 @@ namespace WaterSim.UI
             var bw = Pilknop(r.transform, Teksten.T("beweging"), () => molecuul.beweging = !molecuul.beweging);
             schakelaars.Add((bw.img, bw.t, () => molecuul.beweging));
             var noot = Tekst(paneel.transform, "Model", Teksten.T("model.molecuul"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
-            LE(noot.gameObject, prefH: 28f);
         }
 
         void BouwKristalpaneel()
@@ -1347,7 +1347,6 @@ namespace WaterSim.UI
             schakelaars.Add((bw.img, bw.t, () => kristal.beweging));
 
             var noot = Tekst(uitklap, "Model", Teksten.T("model"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
-            LE(noot.gameObject, prefH: 28f);
         }
 
         Slider Temperatuurschuif(Transform ouder)
