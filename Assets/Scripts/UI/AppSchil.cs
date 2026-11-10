@@ -850,6 +850,8 @@ namespace WaterSim.UI
         WaterSim.Sim.Meer meer;
         int macroModus;              // 0 = glas, 1 = meer, 2 = poolkappen (glas en poolkappen vallen onder de tab IJsmassa)
         Poolweergave poolW;
+        float gesmoltenLand, gesmoltenZee;
+        bool smeltLand, smeltZee;
         int vloeistofKeuze;          // 0 = zoet water, 1 = zeewater, 2 = alcohol
         float luchtT = -5f;
         int zonStand;                              // 0 = geen zon, 1 = winterzon, 2 = voorjaarszon
@@ -903,15 +905,14 @@ namespace WaterSim.UI
             {
                 poolW = vlak.gameObject.AddComponent<Poolweergave>();
                 poolW.raycastTarget = false;
-                poolW.zee = Lin(Hex("145E8A")) * new Color(1f, 1f, 1f, 0.9f); poolW.land = Lin(Hex("8A7058")); poolW.ijs = Lin(Hex("E8F7FF"));
-                poolW.lLand = Tekst(vlak, "Land", Teksten.T("pool.land"), 12f, Color.white, TextAlignmentOptions.Center, true);
-                poolW.lZee = Tekst(vlak, "Zee", Teksten.T("pool.zee"), 12f, Color.white, TextAlignmentOptions.Center, true);
-                poolW.lStijging = Tekst(vlak, "Stijging", "", 12f, Lin(Hex("FFB48A")), TextAlignmentOptions.Right, true);
-                foreach (var l in new[] { poolW.lLand, poolW.lZee, poolW.lStijging })
-                {
-                    l.rectTransform.sizeDelta = new Vector2(170f, 18f);
-                    l.outlineWidth = 0.2f; l.outlineColor = new Color32(4, 16, 26, 230);
-                }
+                poolW.lucht = Lin(Hex("CDEBF3")); poolW.berg = Lin(Hex("77C5D7")); poolW.sneeuw = Color.white;
+                poolW.zee = Lin(Hex("1262A8")); poolW.zeeDonker = Lin(Hex("0E4F8C")); poolW.ijsZij = Lin(Hex("A8DDEB"));
+                var donker = Lin(Hex("0B2230"));
+                poolW.lTitelLand = Tekst(vlak, "Titel land", Teksten.T("pool.land"), 13f, donker, TextAlignmentOptions.Left, true);
+                poolW.lTitelZee = Tekst(vlak, "Titel zee", Teksten.T("pool.zee"), 13f, donker, TextAlignmentOptions.Left, true);
+                poolW.lLand = Tekst(vlak, "Stijging land", "", 13f, Color.white, TextAlignmentOptions.Right, true);
+                poolW.lZee = Tekst(vlak, "Stijging zee", "", 13f, donker, TextAlignmentOptions.Right, true);
+                foreach (var l in new[] { poolW.lTitelLand, poolW.lTitelZee, poolW.lLand, poolW.lZee }) l.rectTransform.sizeDelta = new Vector2(200f, 18f);
             }
             else
             {
@@ -920,17 +921,22 @@ namespace WaterSim.UI
                 meerW.meer = meer;
                 meerW.koud = Lin(Hex("9ED9F0")); meerW.vier = Lin(Hex("0E3F66")); meerW.warm = Lin(Hex("2C7F78"));
                 meerW.bodem = Lin(Hex("3B2A1C")); meerW.vis = Lin(Hex("FFB48A"));
-                foreach (float d in new[] { 0.5f, 2f, 4f, 5.6f })
+                // labels op een donker pilletje: altijd leesbaar, hoe licht of donker het water ook is
+                TextMeshProUGUI Pillabel(string naam)
                 {
-                    var t = Tekst(vlak, "Diepte", "", 11.5f, Color.white, TextAlignmentOptions.Right);
-                    t.rectTransform.sizeDelta = new Vector2(120f, 16f);
-                    t.outlineWidth = 0.2f; t.outlineColor = new Color32(4, 16, 26, 230);
-                    meerW.diepteLabels.Add((t, d));
+                    var pil = Vlak(vlak, naam, new Color(0.02f, 0.07f, 0.12f, 0.72f), 9f);
+                    pil.raycastTarget = false;
+                    var t = Tekst(pil.transform, "Tekst", "", 11.5f, Color.white, TextAlignmentOptions.Center);
+                    Vul(t.rectTransform, 7, 0, 7, 0);
+                    return t;
                 }
-                meerW.lIjs = Tekst(vlak, "IJs", "", 12f, Color.white, TextAlignmentOptions.BottomLeft, true);
-                meerW.lIjs.rectTransform.sizeDelta = new Vector2(120f, 16f);
-                tLucht = Tekst(vlak, "Lucht", "", 12.5f, licht, TextAlignmentOptions.TopLeft);
-                Hoek(tLucht.rectTransform, new Vector2(0f, 1f), new Vector2(12f, -8f), new Vector2(160f, 18f));
+                foreach (float d in new[] { 0.5f, 2f, 4f }) meerW.diepteLabels.Add((Pillabel("Diepte"), d));
+                meerW.lBodem = Pillabel("Bodem");
+                meerW.lIjs = Tekst(vlak, "IJs", "", 12.5f, Color.white, TextAlignmentOptions.BottomLeft, false, true);
+                meerW.lIjs.outlineWidth = 0.2f; meerW.lIjs.outlineColor = new Color32(4, 16, 26, 230);
+                // lucht en datum linksboven, groot
+                tLucht = Tekst(vlak, "Lucht", "", 18f, Color.white, TextAlignmentOptions.TopLeft, true);
+                Hoek(tLucht.rectTransform, new Vector2(0f, 1f), new Vector2(12f, -6f), new Vector2(170f, 46f));
             }
         }
 
@@ -961,13 +967,14 @@ namespace WaterSim.UI
             if (macroModus == 2)
             {
                 var rp = Rij(paneel.transform, "Smelten", 34f, 6f);
-                var sm = Pilknop(rp.transform, "", () =>
-                {
-                    if (gesmolten >= 1f || aanHetSmelten) { gesmolten = 0f; aanHetSmelten = false; }
-                    else aanHetSmelten = true;
-                });
-                tSmeltKnop = sm.t;
-                schakelaars.Add((sm.img, sm.t, () => aanHetSmelten));
+                var sl = Pilknop(rp.transform, Teksten.T("pool.smeltland"), () => smeltLand = true);
+                sl.t.fontSize = 12.5f;
+                schakelaars.Add((sl.img, sl.t, () => smeltLand || gesmoltenLand >= 1f));
+                var sz = Pilknop(rp.transform, Teksten.T("pool.smeltzee"), () => smeltZee = true);
+                sz.t.fontSize = 12.5f;
+                schakelaars.Add((sz.img, sz.t, () => smeltZee || gesmoltenZee >= 1f));
+                var op = Pilknop(rp.transform, Teksten.T("opnieuw"), () => { gesmoltenLand = gesmoltenZee = 0f; smeltLand = smeltZee = false; }, 0.7f);
+                op.t.fontSize = 12.5f;
                 tGlasStatus = Tekst(paneel.transform, "Status", "", 13f, IJsTekst, TextAlignmentOptions.Left, false, true);
             }
             else if (macroModus == 0)
@@ -1089,13 +1096,20 @@ namespace WaterSim.UI
             }
             else if (macroModus == 2 && poolW != null)
             {
-                if (aanHetSmelten) { gesmolten = Mathf.Min(1f, gesmolten + Time.deltaTime / 8f); if (gesmolten >= 1f) aanHetSmelten = false; }
-                poolW.gesmolten = gesmolten;
-                poolW.lStijging.text = gesmolten > 0f ? string.Format(Teksten.T("pool.stijging"), Teksten.Getal(gesmolten * WaterSim.Sim.Constanten.ZeespiegelGroenland, "0.0")) : "";
-                if (tSmeltKnop != null) tSmeltKnop.text = Teksten.T(gesmolten > 0f ? "opnieuw" : "glas.smelt");
+                // landijs en zee-ijs smelten elk apart (in ongeveer 8 seconden)
+                if (smeltLand) { gesmoltenLand = Mathf.Min(1f, gesmoltenLand + Time.deltaTime / 8f); if (gesmoltenLand >= 1f) smeltLand = false; }
+                if (smeltZee) { gesmoltenZee = Mathf.Min(1f, gesmoltenZee + Time.deltaTime / 8f); if (gesmoltenZee >= 1f) smeltZee = false; }
+                poolW.gesmoltenLand = gesmoltenLand; poolW.gesmoltenZee = gesmoltenZee;
+                poolW.lLand.text = gesmoltenLand > 0f ? string.Format(Teksten.T("pool.stijging"), Teksten.Getal(gesmoltenLand * WaterSim.Sim.Constanten.ZeespiegelGroenland, "0.0")) : "";
+                poolW.lZee.text = gesmoltenZee > 0f ? Teksten.T("pool.gelijk") : "";
                 if (tGlasStatus != null)
-                    tGlasStatus.text = gesmolten < 1f ? Teksten.T("pool.status")
-                        : string.Format(Teksten.T("pool.na"), Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelGroenland, "0.0"), Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelAntarctica, "0"));
+                {
+                    bool land = gesmoltenLand >= 1f, zee = gesmoltenZee >= 1f;
+                    tGlasStatus.text = land && zee
+                        ? string.Format(Teksten.T("pool.na"), Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelGroenland, "0.0"), Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelAntarctica, "0"))
+                        : land ? string.Format(Teksten.T("pool.na.land"), Teksten.Getal(WaterSim.Sim.Constanten.ZeespiegelGroenland, "0.0"))
+                        : zee ? Teksten.T("pool.na.zee") : Teksten.T("pool.status");
+                }
             }
             else if (macroModus == 1 && meerW != null && meer != null)
             {
@@ -1125,7 +1139,7 @@ namespace WaterSim.UI
                 double cmPerDag = meer.NettoPerDag * 100;
                 string snelheid = System.Math.Abs(cmPerDag) >= 0.05 ? $" ({(cmPerDag > 0 ? "+" : "−")}{Teksten.Getal(System.Math.Abs(cmPerDag), "0.0")} cm/{Teksten.T("dag")})" : "";
                 meerW.lIjs.text = meer.Ijsdikte > 0.003
-                    ? string.Format(Teksten.T("meer.ijs"), Teksten.Getal(meer.Ijsdikte * 100, "0")) + (waar != "" ? " · " + Teksten.T(waar) + snelheid : "")
+                    ? "<b>" + string.Format(Teksten.T("meer.ijs"), Teksten.Getal(meer.Ijsdikte * 100, "0")) + "</b>" + (waar != "" ? "\n" + Teksten.T(waar) + snelheid : "")
                     : "";
                 // schaatsmeter (richtlijn): < 5 cm niet op, 5–10 één persoon, 10–15 schaatsen, ≥ 15 toertocht
                 double cm = meer.Ijsdikte * 100;
@@ -1136,12 +1150,13 @@ namespace WaterSim.UI
                     tSchaats.text = Teksten.T("schaats." + stap);
                     schaatsPil.color = Lin(Hex(stap == 0 ? "D9483B" : stap == 1 ? "E8902E" : "3E9E5A"));
                 }
-                if (tLucht != null) tLucht.text = $"{Teksten.T("lucht")} {Teksten.Graden(luchtT, 0, true)}";
+                if (tLucht != null)
+                    tLucht.text = $"{Teksten.T("lucht")} {Teksten.Graden(luchtT, 0, true)}\n<size=75%><color=#B9DCEA>" +
+                                  (jaarModus ? Datum(dag) : $"{Teksten.T("dag.hoofd")} {(int)(meer.Tijd / 86400.0)}") + "</color></size>";
+                if (meerW.lBodem != null) meerW.lBodem.text = $"{Teksten.T("bodem")} <b>{Teksten.Graden(meer.Bodem, 1)}</b>";
                 if (tLuchtWaarde != null) tLuchtWaarde.text = Teksten.Graden(luchtT, 0, true);
                 if (tMeerStatus != null)
-                    tMeerStatus.text = jaarModus
-                        ? string.Format(Teksten.T("meer.status.jaar"), Datum(dag), Teksten.Graden(meer.Bodem, 1))
-                        : string.Format(Teksten.T("meer.status"), (int)(meer.Tijd / 86400.0), Teksten.Graden(meer.Bodem, 1));
+                    tMeerStatus.text = meer.Ijsdikte > 0.003 ? string.Format(Teksten.T("meer.ijsstatus"), Teksten.Getal(meer.Ijsdikte * 100, "0")) : Teksten.T("meer.geenijs");
             }
         }
 

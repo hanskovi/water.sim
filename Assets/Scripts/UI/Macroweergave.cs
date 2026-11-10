@@ -259,7 +259,7 @@ namespace WaterSim.UI
     public class Meerweergave : MaskableGraphic
     {
         public Meer meer;
-        public TextMeshProUGUI lIjs;
+        public TextMeshProUGUI lIjs, lBodem;
         public readonly List<(TextMeshProUGUI t, float diepte)> diepteLabels = new List<(TextMeshProUGUI, float)>();
         public Color koud = new Color(0.6f, 0.85f, 0.95f, 1f), vier = new Color(0.04f, 0.22f, 0.4f, 1f), warm = new Color(0.12f, 0.45f, 0.42f, 1f);
         public Color ijsKleur = new Color(0.9f, 0.97f, 1f, 0.95f), bodem = new Color(0.23f, 0.16f, 0.11f, 1f), vis = new Color(1f, 0.6f, 0.4f, 1f);
@@ -269,9 +269,16 @@ namespace WaterSim.UI
 
         void Maten(Rect r, out float boven, out float onder, out float schaal)
         {
-            boven = r.yMax - Mathf.Max(r.height * 0.36f, 150f);   // bovenin ruimte voor lucht, zon en het formulekaartje
+            boven = r.yMax - Mathf.Max(r.height * 0.42f, 175f);   // bovenin ruimte voor lucht en datum, zon, ijslabel en formulekaartje
             onder = r.yMin + r.height * 0.05f;
             schaal = meer != null ? (boven - onder) / (float)meer.Diepte : 1f;
+        }
+
+        // bovenkant van het ijs plus het smeltwater (waar het ijslabel op staat)
+        float IjsTop(float boven, float schaal)
+        {
+            float sw = meer.Smeltwater > 0.0005 ? Mathf.Clamp((float)meer.Smeltwater * schaal * 3f, 2f, 7f) : 0f;
+            return boven + 0.08f * (float)meer.Ijsdikte * schaal + sw;
         }
 
         public Color Kleur(double t)
@@ -326,10 +333,13 @@ namespace WaterSim.UI
             // zon: groter en feller bij meer zonlicht
             if (meer.Zon > 1)
             {
+                // tussen de tekst linksboven (lucht, datum) en het ijslabel boven het water
                 float sterkte = Mathf.Clamp01((float)meer.Zon / 230f);
-                float ruimte = r.yMax - boven;
-                var zm = new Vector2(x0 + 52f, boven + ruimte * 0.5f);
-                Zonnetje.Teken(vh, zm, Mathf.Lerp(11f, 19f, sterkte), Mathf.Min(ruimte * 0.46f, 60f) * Mathf.Lerp(0.7f, 1f, sterkte), Mathf.Lerp(0.55f, 1f, sterkte), t);
+                float bovengrens = r.yMax - 54f, ondergrens = IjsTop(boven, schaal) + 46f;
+                float ruimte = Mathf.Max(20f, (bovengrens - ondergrens) * 0.5f);
+                var zm = new Vector2(x0 + 56f, (bovengrens + ondergrens) * 0.5f);
+                float schijf = Mathf.Clamp(ruimte * 0.32f, 8f, 16f) * Mathf.Lerp(0.75f, 1f, sterkte);
+                Zonnetje.Teken(vh, zm, schijf, (ruimte - schijf) * Mathf.Lerp(0.7f, 1f, sterkte), Mathf.Lerp(0.55f, 1f, sterkte), t);
             }
 
             // bodem (golvend) en een vis vlak boven de bodem
@@ -352,25 +362,39 @@ namespace WaterSim.UI
             var r = rectTransform.rect;
             if (meer == null || r.width < 40f) return;
             Maten(r, out float boven, out float onder, out float schaal);
+            // dieptelabels: wit op een donker pilletje (altijd leesbaar); nooit over het ijs, dan net eronder
+            float ijsOnder = boven - 0.92f * (float)meer.Ijsdikte * schaal;
+            float vorige = float.MaxValue;
             foreach (var (t, diepte) in diepteLabels)
             {
                 if (t == null) continue;
-                t.rectTransform.anchorMin = t.rectTransform.anchorMax = Vector2.zero;
-                t.rectTransform.pivot = new Vector2(1f, 0.5f);
-                t.rectTransform.anchoredPosition = new Vector2(r.width - 12f, boven - diepte * schaal - r.yMin);
-                // tekstkleur volgens de achtergrond: donkere tekst op licht ijs of koud (licht) water, anders wit
-                Color achter = diepte < 0.92 * meer.Ijsdikte ? ijsKleur
-                             : Kleur(meer.T[Mathf.Clamp((int)(diepte / meer.Diepte * meer.Lagen), 0, meer.Lagen - 1)]);
-                bool licht = 0.2126f * achter.r + 0.7152f * achter.g + 0.0722f * achter.b > 0.35f;
-                t.color = licht ? new Color(0.02f, 0.09f, 0.15f, 1f) : Color.white;
-                t.outlineColor = licht ? new Color32(235, 248, 255, 200) : new Color32(4, 16, 26, 230);
+                var pil = t.transform.parent as RectTransform;
+                if (pil == null) continue;
+                float y = Mathf.Min(boven - diepte * schaal, ijsOnder - 13f);
+                y = Mathf.Min(y, vorige - 22f);                   // niet op elkaar
+                vorige = y;
+                pil.anchorMin = pil.anchorMax = Vector2.zero;
+                pil.pivot = new Vector2(1f, 0.5f);
+                pil.sizeDelta = new Vector2(t.preferredWidth + 14f, 19f);
+                pil.anchoredPosition = new Vector2(r.width - 10f, y - r.yMin);
+            }
+            if (lBodem != null)
+            {
+                var pil = lBodem.transform.parent as RectTransform;
+                if (pil != null)
+                {
+                    pil.anchorMin = pil.anchorMax = Vector2.zero;
+                    pil.pivot = new Vector2(0.5f, 0.5f);
+                    pil.sizeDelta = new Vector2(lBodem.preferredWidth + 14f, 19f);
+                    pil.anchoredPosition = new Vector2(r.width * 0.5f, onder - r.yMin - 2f);
+                }
             }
             if (lIjs != null)
             {
                 lIjs.rectTransform.anchorMin = lIjs.rectTransform.anchorMax = Vector2.zero;
                 lIjs.rectTransform.pivot = new Vector2(0f, 0f);
-                float sw = meer.Smeltwater > 0.0005 ? Mathf.Clamp((float)meer.Smeltwater * schaal * 3f, 2f, 7f) : 0f;
-                lIjs.rectTransform.anchoredPosition = new Vector2(12f, boven + 0.08f * (float)meer.Ijsdikte * schaal + sw + 5f - r.yMin);
+                lIjs.rectTransform.sizeDelta = new Vector2(Mathf.Max(60f, r.width - 24f), 40f);
+                lIjs.rectTransform.anchoredPosition = new Vector2(12f, IjsTop(boven, schaal) + 5f - r.yMin);
             }
         }
 
@@ -425,14 +449,21 @@ namespace WaterSim.UI
     }
 
     /// <summary>
-    /// Level 5, poolkappen: doorsnede met landijs op een continent (zoals Groenland) en drijvend zee-ijs (Noordpool).
-    /// Bij smelten stijgt de zeespiegel alleen door het landijs. Hoogtes niet op schaal.
+    /// Level 5, poolkappen: twee plaatjes onder elkaar, elk apart te laten smelten.
+    /// Boven: landijs op bergen (zoals Groenland) — smelt het, dan stijgt de zeespiegel.
+    /// Onder: zee-ijs dat drijft (Noordpool) — smelt het, dan blijft de zeespiegel (bijna) gelijk.
+    /// Vlakke stijl met lichte lucht, turquoise bergen en witte ijsschotsen. Hoogtes niet op schaal.
     /// </summary>
     public class Poolweergave : MaskableGraphic
     {
-        [Range(0f, 1f)] public float gesmolten;
-        public Color zee = new Color(0.08f, 0.35f, 0.55f, 0.85f), land = new Color(0.36f, 0.3f, 0.24f, 1f), ijs = new Color(0.9f, 0.97f, 1f, 0.95f);
-        public TextMeshProUGUI lLand, lZee, lStijging;
+        [Range(0f, 1f)] public float gesmoltenLand, gesmoltenZee;
+        public Color lucht = new Color(0.8f, 0.92f, 0.95f, 1f), berg = new Color(0.46f, 0.77f, 0.84f, 1f), sneeuw = Color.white;
+        public Color zee = new Color(0.06f, 0.38f, 0.66f, 1f), zeeDonker = new Color(0.04f, 0.3f, 0.55f, 1f), ijsZij = new Color(0.66f, 0.87f, 0.92f, 1f);
+        public TextMeshProUGUI lTitelLand, lTitelZee, lLand, lZee;
+
+        /// <summary>De twee plaatjes (lokale coördinaten), zodat de labels erbij kunnen.</summary>
+        public Rect Land { get; private set; }
+        public Rect Zee { get; private set; }
 
         void Update() { SetVerticesDirty(); }
 
@@ -440,52 +471,122 @@ namespace WaterSim.UI
         {
             vh.Clear();
             var r = rectTransform.rect;
-            if (r.width < 60f || r.height < 80f) return;
-            float x0 = r.xMin + 6f, x1 = r.xMax - 6f, bodem = r.yMin + 6f;
-            float zee0 = r.yMin + r.height * 0.34f;
-            float stijg = r.height * 0.07f * gesmolten;                 // overdreven: alleen landijs laat het stijgen
-            float zeeNu = zee0 + stijg;
-            float landRand = Mathf.Lerp(x0, x1, 0.46f), landTop = zee0 + r.height * 0.08f;
-
-            // zee
-            Blok(vh, x0, bodem, x1, zeeNu, zee);
-            // land (continent) met een grillige kust
-            var kust = new List<Vector2> { new Vector2(x0, bodem), new Vector2(landRand + 14f, bodem), new Vector2(landRand, landTop - 6f), new Vector2(landRand - 10f, landTop) , new Vector2(x0, landTop + 4f) };
-            Veelhoek(vh, kust, land);
-            // landijs: koepel, wordt lager bij smelten
-            float koepel = r.height * 0.36f * (1f - gesmolten);
-            if (koepel > 1f)
-            {
-                var k = new List<Vector2>();
-                float a = x0 + 6f, b = landRand - 14f;
-                for (int i = 0; i <= 24; i++)
-                {
-                    float f = i / 24f;
-                    k.Add(new Vector2(Mathf.Lerp(a, b, f), landTop + koepel * Mathf.Pow(Mathf.Max(0f, Mathf.Sin(f * Mathf.PI)), 0.6f)));
-                }
-                k.Add(new Vector2(b, landTop)); k.Add(new Vector2(a, landTop));
-                Veelhoek(vh, k, ijs);
-            }
-            // zee-ijs: drijvende schots (92 % onder water), wordt dunner maar het niveau verandert er niet door
-            float dik = 14f * (1f - gesmolten);
-            if (dik > 0.5f)
-            {
-                float a = Mathf.Lerp(x0, x1, 0.6f), b = Mathf.Lerp(x0, x1, 0.94f);
-                Blok(vh, a, zeeNu - 0.92f * dik, b, zeeNu + 0.08f * dik, ijs);
-            }
-            // oude zeespiegel als stippellijn
-            if (gesmolten > 0f)
-                for (float x = x0; x < x1; x += 8f)
-                    Tekenhulp.Lijn(vh, new Vector2(x, zee0), new Vector2(Mathf.Min(x + 4f, x1), zee0), 1.2f, new Color(1f, 1f, 1f, 0.6f));
-            Tekenhulp.Lijn(vh, new Vector2(landRand - 4f, zeeNu), new Vector2(x1, zeeNu), 2f, new Color(0.65f, 0.9f, 0.97f, 1f));
-
-            // labels
-            Zet(lLand, new Vector2(Mathf.Lerp(x0, landRand, 0.45f), landTop + koepel + 14f), r, 0.5f);
-            Zet(lZee, new Vector2(Mathf.Lerp(x0, x1, 0.77f), zeeNu + 22f), r, 0.5f);
-            Zet(lStijging, new Vector2(x1 - 4f, zee0 - 16f), r, 1f);
+            if (r.width < 80f || r.height < 120f) return;
+            float gat = 8f, h = (r.height - gat) * 0.5f;
+            Land = new Rect(r.xMin, r.yMin + h + gat, r.width, h);
+            Zee = new Rect(r.xMin, r.yMin, r.width, h);
+            float t = Time.time;
+            TekenLand(vh, Land, t);
+            TekenZee(vh, Zee, t);
+            Plaats(lTitelLand, new Vector2(Land.xMin + 10f, Land.yMax - 12f), r, 0f);
+            Plaats(lTitelZee, new Vector2(Zee.xMin + 10f, Zee.yMax - 12f), r, 0f);
         }
 
-        static void Zet(TextMeshProUGUI l, Vector2 p, Rect r, float pivotX)
+        void TekenLand(VertexHelper vh, Rect P, float t)
+        {
+            Blok(vh, P.xMin, P.yMin, P.xMax, P.yMax, lucht);
+            float zee0 = P.yMin + 0.3f * P.height;
+            float zeeNu = zee0 + 0.16f * P.height * gesmoltenLand;     // sterk overdreven
+            // bergen (turquoise), van links tot ver in beeld; het land loopt onder water door
+            float[] fx = { 0f, 0.1f, 0.2f, 0.3f, 0.42f, 0.54f, 0.64f, 0.72f, 0.78f };
+            float[] fy = { 0.42f, 0.62f, 0.8f, 0.6f, 0.86f, 0.64f, 0.5f, 0.32f, 0.12f };
+            var bergLijn = new List<Vector2>();
+            for (int k = 0; k < fx.Length; k++) bergLijn.Add(new Vector2(P.xMin + fx[k] * P.width, P.yMin + fy[k] * P.height));
+            Strook(vh, bergLijn, P.yMin, berg);
+            // ijskap: wit pak op de bergen, dunner naarmate het smelt
+            var ijsLijn = new List<Vector2>();
+            for (int k = 0; k <= 40; k++)
+            {
+                float f = k / 40f, x = P.xMin + Mathf.Lerp(0f, 0.74f, f) * P.width;
+                float yb = Bergh(bergLijn, x);
+                float dik = 0.13f * P.height * Mathf.Pow(Mathf.Max(0f, Mathf.Sin(f * Mathf.PI)), 0.5f) * (1f - gesmoltenLand);
+                ijsLijn.Add(new Vector2(x, yb + dik));
+            }
+            for (int k = 0; k < ijsLijn.Count - 1; k++)
+            {
+                var a = ijsLijn[k]; var b = ijsLijn[k + 1];
+                Vierhoek(vh, new Vector2(a.x, Bergh(bergLijn, a.x) - 1f), new Vector2(b.x, Bergh(bergLijn, b.x) - 1f), b, a, sneeuw);
+            }
+            // smeltwater dat van het ijs in zee loopt
+            if (gesmoltenLand > 0f && gesmoltenLand < 1f)
+                for (int k = 0; k < 4; k++)
+                {
+                    float f = Mathf.Repeat(t * 0.7f + k / 4f, 1f);
+                    float x = P.xMin + Mathf.Lerp(0.62f, 0.8f, f) * P.width;
+                    Tekenhulp.Schijf(vh, new Vector2(x, Mathf.Max(zeeNu, Bergh(bergLijn, x) + 2f)), 2.2f, new Color(0.3f, 0.6f, 0.95f, 1f), 8);
+                }
+            // zee, met donkere strepen
+            Blok(vh, P.xMin, P.yMin, P.xMax, zeeNu, zee);
+            Strepen(vh, P, zeeNu);
+            // oude zeespiegel als stippellijn
+            if (gesmoltenLand > 0f) Stippellijn(vh, P.xMin + 0.55f * P.width, P.xMax, zee0);
+            Plaats(lLand, new Vector2(P.xMax - 10f, zeeNu - 14f), rectTransform.rect, 1f);
+        }
+
+        void TekenZee(VertexHelper vh, Rect P, float t)
+        {
+            Blok(vh, P.xMin, P.yMin, P.xMax, P.yMax, lucht);
+            // verre bergen aan de horizon (decor)
+            var verte = new List<Vector2>();
+            float[] fx = { 0f, 0.15f, 0.3f, 0.48f, 0.62f, 0.8f, 1f };
+            float[] fy = { 0.62f, 0.72f, 0.66f, 0.76f, 0.68f, 0.74f, 0.64f };
+            for (int k = 0; k < fx.Length; k++) verte.Add(new Vector2(P.xMin + fx[k] * P.width, P.yMin + fy[k] * P.height));
+            Strook(vh, verte, P.yMin, new Color(berg.r, berg.g, berg.b, 0.55f));
+            float zeeY = P.yMin + 0.56f * P.height;                     // de zeespiegel blijft gelijk
+            Blok(vh, P.xMin, P.yMin, P.xMax, zeeY, zee);
+            Strepen(vh, P, zeeY);
+            // drie schotsen: 10 % boven water; het deel onder water schemert door het water heen
+            float[,] s = { { 0.05f, 0.42f, 1f }, { 0.48f, 0.9f, 0.85f }, { 0.22f, 0.66f, 0.7f } };
+            float[] diep = { 0f, -0.16f, -0.32f };
+            for (int k = 0; k < 3; k++)
+            {
+                float krimp = 1f - 0.6f * gesmoltenZee;
+                float dik = 0.11f * P.height * s[k, 2] * (1f - gesmoltenZee);
+                if (dik < 0.5f) continue;
+                float y = zeeY + diep[k] * P.height * 0.5f;           // lager in beeld = dichterbij (vlakke stijl, zonder echt perspectief)
+                float mid = P.xMin + (s[k, 0] + s[k, 1]) * 0.5f * P.width, half = (s[k, 1] - s[k, 0]) * 0.5f * P.width * krimp;
+                float top = y + 0.1f * dik, bodem = y - 0.9f * dik, diepte = 0.035f * P.height * krimp;
+                // onderwaterdeel (lichtblauw, half doorzichtig) en zijkant boven water
+                Vierhoek(vh, new Vector2(mid - half, bodem), new Vector2(mid + half, bodem), new Vector2(mid + half, y), new Vector2(mid - half, y), new Color(ijsZij.r, ijsZij.g, ijsZij.b, 0.45f));
+                Vierhoek(vh, new Vector2(mid - half, y), new Vector2(mid + half, y), new Vector2(mid + half, top), new Vector2(mid - half, top), ijsZij);
+                // bovenvlak (wit, in perspectief)
+                Vierhoek(vh, new Vector2(mid - half, top), new Vector2(mid + half, top), new Vector2(mid + half - 14f, top + diepte), new Vector2(mid - half + 22f, top + diepte), sneeuw);
+            }
+            Plaats(lZee, new Vector2(P.xMax - 10f, zeeY + 14f), rectTransform.rect, 1f);
+        }
+
+        // hoogte van de berglijn op x (lineair tussen de punten)
+        static float Bergh(List<Vector2> lijn, float x)
+        {
+            if (x <= lijn[0].x) return lijn[0].y;
+            for (int k = 0; k < lijn.Count - 1; k++)
+                if (x <= lijn[k + 1].x) return Mathf.Lerp(lijn[k].y, lijn[k + 1].y, Mathf.InverseLerp(lijn[k].x, lijn[k + 1].x, x));
+            return lijn[lijn.Count - 1].y;
+        }
+
+        // gevuld vlak tussen een lijn en een horizontale onderkant
+        static void Strook(VertexHelper vh, List<Vector2> lijn, float onder, Color k)
+        {
+            for (int i = 0; i < lijn.Count - 1; i++)
+                Vierhoek(vh, new Vector2(lijn[i].x, onder), new Vector2(lijn[i + 1].x, onder), lijn[i + 1], lijn[i], k);
+        }
+
+        void Strepen(VertexHelper vh, Rect P, float zeeY)
+        {
+            for (int k = 1; k <= 5; k++)
+            {
+                float y = zeeY - k * (zeeY - P.yMin) / 6.5f;
+                float a = P.xMin + ((k * 37) % 50) / 100f * P.width, b = a + P.width * 0.32f;
+                Tekenhulp.Lijn(vh, new Vector2(a, y), new Vector2(Mathf.Min(b, P.xMax - 4f), y), 2f, zeeDonker);
+            }
+        }
+
+        static void Stippellijn(VertexHelper vh, float a, float b, float y)
+        {
+            for (float x = a; x < b; x += 8f) Tekenhulp.Lijn(vh, new Vector2(x, y), new Vector2(Mathf.Min(x + 4f, b), y), 1.4f, new Color(1f, 1f, 1f, 0.85f));
+        }
+
+        static void Plaats(TextMeshProUGUI l, Vector2 p, Rect r, float pivotX)
         {
             if (l == null) return;
             l.rectTransform.anchorMin = l.rectTransform.anchorMax = Vector2.zero;
@@ -501,14 +602,11 @@ namespace WaterSim.UI
             vh.AddTriangle(i, i + 1, i + 2); vh.AddTriangle(i, i + 2, i + 3);
         }
 
-        // bolle veelhoek als waaier vanuit het zwaartepunt
-        static void Veelhoek(VertexHelper vh, List<Vector2> p, Color k)
+        static void Vierhoek(VertexHelper vh, Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color k)
         {
-            var m = Vector2.zero; foreach (var q in p) m += q; m /= p.Count;
-            int s = vh.currentVertCount;
-            vh.AddVert(m, k, Vector4.zero);
-            foreach (var q in p) vh.AddVert(q, k, Vector4.zero);
-            for (int i = 0; i < p.Count; i++) vh.AddTriangle(s, s + 1 + i, s + 1 + (i + 1) % p.Count);
+            int i = vh.currentVertCount;
+            vh.AddVert(a, k, Vector4.zero); vh.AddVert(b, k, Vector4.zero); vh.AddVert(c, k, Vector4.zero); vh.AddVert(d, k, Vector4.zero);
+            vh.AddTriangle(i, i + 1, i + 2); vh.AddTriangle(i, i + 2, i + 3);
         }
     }
 }
