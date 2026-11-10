@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.UI;
 using WaterSim.Sim;
 
 namespace WaterSim.Weergave
@@ -37,6 +38,7 @@ namespace WaterSim.Weergave
         Color brugKleur, kernKleur;
         Mesh hoekvlak;
         Canvas labelDoek;
+        Hoekboog2D boog2D;
         Camera cam;
 
         // één molecuul: O en de twee H-atomen
@@ -71,6 +73,13 @@ namespace WaterSim.Weergave
                 labelDoek = go.GetComponent<Canvas>();
                 labelDoek.renderMode = RenderMode.ScreenSpaceOverlay;
                 labelDoek.sortingOrder = 50;                 // boven het 3D-beeld, onder de knoppen
+                // gradenboog als platte lijn met pijlpunten, achter de labels
+                var bg = new GameObject("Hoekboog", typeof(RectTransform), typeof(CanvasRenderer));
+                bg.transform.SetParent(labelDoek.transform, false);
+                var brt = (RectTransform)bg.transform;
+                brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one; brt.offsetMin = brt.offsetMax = Vector2.zero;
+                boog2D = bg.AddComponent<Hoekboog2D>();
+                boog2D.raycastTarget = false;
             }
             labelDoek.gameObject.SetActive(true);
         }
@@ -110,7 +119,7 @@ namespace WaterSim.Weergave
                 if (!kalotten)
                 {
                     toonHoek = true;
-                    Hoek(m);
+                    Hoek2D(m);
                     var bis = ((m.h1 + m.h2) * 0.5f - m.o).normalized;
                     Label(ref lab, m.o + bis * (OH + 0.45f), Hoektekst(), Color.white, 14f);
                 }
@@ -135,6 +144,7 @@ namespace WaterSim.Weergave
                 if (toonLadingen) { Ladingen(ref lab, a, rO, rH); Ladingen(ref lab, b, rO, rH); }
             }
             for (int i = lab; i < labels.Count; i++) labels[i].gameObject.SetActive(false);
+            if (boog2D != null && !toonHoek) boog2D.Zet(null);
 
             // straal van alles wat in beeld moet (atomen + ruimte voor de labels)
             float straal = 0f;
@@ -163,11 +173,7 @@ namespace WaterSim.Weergave
                     Teken(mesh, brugMat, mB);
                     Teken(mesh, kernMat, mBK);
                 }
-                if (toonHoek && vlakMat != null)
-                {
-                    Graphics.RenderMesh(new RenderParams(vlakMat) { shadowCastingMode = ShadowCastingMode.Off, worldBounds = new Bounds(Vector3.zero, Vector3.one * 1000f) }, hoekvlak, 0, Matrix4x4.identity);
-                    Teken(bron.cilinder, boogMat != null ? boogMat : randMat, mBoog);
-                }
+
             }
         }
 
@@ -208,20 +214,21 @@ namespace WaterSim.Weergave
             }
         }
 
-        // taartpunt tussen de twee O–H-bindingen (dubbelzijdig) met een heldere boog die van H-atoom naar H-atoom loopt
-        void Hoek(Mol m)
+        // gradenboog: van H-atoom naar H-atoom, als punten op het scherm voor de platte lijn met pijlpunten
+        readonly List<Vector2> boogPunten = new List<Vector2>();
+        void Hoek2D(Mol m)
         {
+            if (boog2D == null) return;
             var a = (m.h1 - m.o).normalized; var b = (m.h2 - m.o).normalized;
-            const int stukken = 24; const float straal = 0.78f;            // net binnen de H-atomen (die beginnen op ≈ 0,76 Å)
-            var v = new List<Vector3> { m.o };
-            for (int k = 0; k <= stukken; k++) v.Add(m.o + Vector3.Slerp(a, b, k / (float)stukken) * straal);
-            var d = new List<int>();
-            for (int k = 1; k <= stukken; k++) { d.Add(0); d.Add(k); d.Add(k + 1); d.Add(0); d.Add(k + 1); d.Add(k); }
-            hoekvlak.Clear();
-            hoekvlak.SetVertices(v);
-            hoekvlak.SetTriangles(d, 0);
-            hoekvlak.RecalculateBounds();
-            for (int k = 1; k <= stukken; k++) mBoog.Add(Staaf(v[k], v[k + 1], 0.035f));
+            const int stukken = 32; const float straal = 0.78f;             // net binnen de H-atomen (die beginnen op ≈ 0,76 Å)
+            boogPunten.Clear();
+            for (int k = 0; k <= stukken; k++)
+            {
+                var p = cam.WorldToScreenPoint(m.o + Vector3.Slerp(a, b, Mathf.Lerp(0.06f, 0.94f, k / (float)stukken)) * straal);
+                if (p.z <= 0f) { boog2D.Zet(null); return; }
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(boog2D.rectTransform, p, null, out var lok)) boogPunten.Add(lok);
+            }
+            boog2D.Zet(boogPunten);
         }
 
         static string Hoektekst() => ((float)Constanten.HoekHOH).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
@@ -273,6 +280,44 @@ namespace WaterSim.Weergave
             t.text = tekst; t.color = kleur;
             t.fontSize = grootte * Mathf.Min(Screen.width / 390f, Screen.height / 844f);   // zelfde maat als de rest van de interface
             t.rectTransform.position = new Vector3(s.x, s.y, 0f);
+        }
+    }
+
+    /// <summary>Platte gradenboog op het scherm: een lijn met aan beide uiteinden een pijlpunt (zoals in het schoolboek).</summary>
+    public class Hoekboog2D : MaskableGraphic
+    {
+        readonly List<Vector2> punten = new List<Vector2>();
+        public Color lijn = new Color(0.62f, 0.86f, 1f, 1f);
+
+        public void Zet(List<Vector2> nieuw)
+        {
+            punten.Clear();
+            if (nieuw != null) punten.AddRange(nieuw);
+            SetVerticesDirty();
+        }
+
+        protected override void OnPopulateMesh(VertexHelper vh)
+        {
+            vh.Clear();
+            if (punten.Count < 3) return;
+            float schaal = Mathf.Min(Screen.width / 390f, Screen.height / 844f);
+            float dik = 2.4f * schaal, pijl = 9f * schaal;
+            UI.Tekenhulp.Lijnstuk(vh, punten, dik, lijn, true);
+            Pijlpunt(vh, punten[1], punten[0], pijl, dik);
+            Pijlpunt(vh, punten[punten.Count - 2], punten[punten.Count - 1], pijl, dik);
+        }
+
+        void Pijlpunt(VertexHelper vh, Vector2 van, Vector2 naar, float lengte, float dik)
+        {
+            var d = (naar - van).normalized;
+            if (d.sqrMagnitude < 0.5f) return;
+            var n = new Vector2(-d.y, d.x);
+            var top = naar + d * lengte * 0.35f;
+            int i = vh.currentVertCount;
+            vh.AddVert(top, lijn, Vector4.zero);
+            vh.AddVert(naar - d * lengte * 0.65f + n * lengte * 0.5f, lijn, Vector4.zero);
+            vh.AddVert(naar - d * lengte * 0.65f - n * lengte * 0.5f, lijn, Vector4.zero);
+            vh.AddTriangle(i, i + 1, i + 2);
         }
     }
 }

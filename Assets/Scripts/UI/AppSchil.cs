@@ -148,6 +148,7 @@ namespace WaterSim.UI
             bouwen = true;
             if (canvas != null) Destroy(canvas.gameObject);
             snel.Clear(); schakelaars.Clear(); infoKnoppen.Clear(); vasteHoogtes.Clear();
+            volledigKnop = volledigBalk = bovenbalk = onderPaneel = null;
             schuif = null; ring = null; kromme = null;      // alleen level 4 bouwt deze opnieuw
             zoomHouder = null; glasW = null; meerW = null; poolW = null; luchtSchuif = null;
 
@@ -532,6 +533,7 @@ namespace WaterSim.UI
 
             // bovenbalk: terug · level · sterren
             var balk = Waterglas(simPagina, "Bovenbalk", 10f);
+            bovenbalk = balk.gameObject;
             LE(balk.gameObject, prefH: 44f, minH: 44f);
             var bh = balk.gameObject.AddComponent<HorizontalLayoutGroup>();
             bh.padding = new RectOffset(10, 10, 6, 6); bh.spacing = 10;
@@ -561,6 +563,7 @@ namespace WaterSim.UI
             LE(vrij.gameObject, flexH: 1f);
             vrijRt = vrij;
             if (MacroLevel) BouwMacro(vrij); else Zoomknoppen(vrij);
+            if (Levels[level].scene == 0 || Levels[level].scene == 3) VolledigKnoppen(vrij);
             Formulekaart(vrij);
             Infovak(vrij);
             if (MacroLevel) { BouwMacropaneel(); return; }
@@ -817,6 +820,69 @@ namespace WaterSim.UI
 
         RectTransform zoomHouder;
 
+        // ---------- volledig scherm (level 3 en 4): alleen het 3D-beeld, met een knop terug en de i ----------
+        bool volledig;
+        GameObject bovenbalk, onderPaneel, volledigKnop, volledigBalk;
+
+        void VolledigKnoppen(RectTransform vrij)
+        {
+            var wit = Color.white;
+            Formuletekening Icoontje(Transform ouder, bool uit)
+            {
+                var rt = Maak("Icoon", ouder);
+                Hoek(rt, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24f, 24f));
+                rt.pivot = new Vector2(0.5f, 0.5f); rt.anchoredPosition = Vector2.zero;
+                rt.gameObject.AddComponent<CanvasRenderer>();
+                var t = rt.gameObject.AddComponent<Formuletekening>();
+                t.raycastTarget = false;
+                // vier hoekjes: naar buiten (vergroten) of naar binnen (verkleinen)
+                float a = 3f, b = 9f, c = 15f, d = 21f;
+                if (uit)
+                {
+                    t.Streep(new Vector2(a, b), new Vector2(a, a), wit); t.Streep(new Vector2(a, a), new Vector2(b, a), wit);
+                    t.Streep(new Vector2(c, a), new Vector2(d, a), wit); t.Streep(new Vector2(d, a), new Vector2(d, b), wit);
+                    t.Streep(new Vector2(a, c), new Vector2(a, d), wit); t.Streep(new Vector2(a, d), new Vector2(b, d), wit);
+                    t.Streep(new Vector2(d, c), new Vector2(d, d), wit); t.Streep(new Vector2(d, d), new Vector2(c, d), wit);
+                }
+                else
+                {
+                    t.Streep(new Vector2(b, a), new Vector2(b, b), wit); t.Streep(new Vector2(b, b), new Vector2(a, b), wit);
+                    t.Streep(new Vector2(c, a), new Vector2(c, b), wit); t.Streep(new Vector2(c, b), new Vector2(d, b), wit);
+                    t.Streep(new Vector2(a, c), new Vector2(b, c), wit); t.Streep(new Vector2(b, c), new Vector2(b, d), wit);
+                    t.Streep(new Vector2(d, c), new Vector2(c, c), wit); t.Streep(new Vector2(c, c), new Vector2(c, d), wit);
+                }
+                return t;
+            }
+            // knop "volledig scherm" linksonder in het beeld
+            var k = Waterglas(vrij, "Volledig scherm", 10f);
+            Hoek(k.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 4f), new Vector2(42f, 42f));
+            Icoontje(k.transform, true);
+            Knop(k, () => { volledig = true; infoOpen = false; });
+            volledigKnop = k.gameObject;
+            // in volledig scherm: linksboven terug (verkleinen) en de i
+            var balk = Maak("Volledig scherm knoppen", simPagina);
+            balk.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            Hoek(balk, new Vector2(0f, 1f), new Vector2(8f, -8f), new Vector2(96f, 44f));
+            var terug = Waterglas(balk, "Terug", 10f);
+            Hoek(terug.rectTransform, new Vector2(0f, 1f), Vector2.zero, new Vector2(44f, 44f));
+            Icoontje(terug.transform, false);
+            Knop(terug, () => { volledig = false; infoOpen = false; });
+            var ik = Infoknop(balk);
+            Hoek(ik.rectTransform, new Vector2(0f, 1f), new Vector2(52f, -4f), new Vector2(36f, 36f));
+            volledigBalk = balk.gameObject;
+            volledigBalk.SetActive(false);
+        }
+
+        void PasVolledigAan()
+        {
+            if (volledigKnop == null) return;
+            bool v = volledig && pagina == Pagina.Sim;
+            if (bovenbalk != null && bovenbalk.activeSelf == v) bovenbalk.SetActive(!v);
+            if (onderPaneel != null && onderPaneel.activeSelf == v) onderPaneel.SetActive(!v);
+            if (volledigKnop.activeSelf == v) volledigKnop.SetActive(!v);
+            if (volledigBalk != null && volledigBalk.activeSelf != v) volledigBalk.SetActive(v);
+        }
+
         // + en − rechts in beeld: dichterbij / verder weg (ook in de editor, waar knijpen niet kan)
         void Zoomknoppen(RectTransform vrij)
         {
@@ -838,6 +904,7 @@ namespace WaterSim.UI
         void BouwIjspaneel()
         {
             var paneel = Waterglas(simPagina, "Bediening", 14f);
+            onderPaneel = paneel.gameObject;
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
             Beschrijving(paneel, "level.3.zie");
@@ -865,7 +932,7 @@ namespace WaterSim.UI
             if (nieuw == level) return;
             level = nieuw;
             PlayerPrefs.SetInt("watersim.level", level);
-            infoOpen = false;
+            infoOpen = false; volledig = false;
             if (kristal != null) kristal.kalotten = false;     // elk level begint in zijn eigen standaardweergave
             kalottenZetteBlok = false;
             ToonPagina(Pagina.Sim);
@@ -971,6 +1038,7 @@ namespace WaterSim.UI
         void BouwMacropaneel()
         {
             var paneel = Waterglas(simPagina, "Bediening", 14f);
+            onderPaneel = paneel.gameObject;
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
             Beschrijving(paneel, macroModus == 0 ? "level.5.zie.glas" : macroModus == 2 ? "level.5.zie.pool" : "level.5.zie.meer");
@@ -1273,6 +1341,7 @@ namespace WaterSim.UI
         void BouwMolecuulpaneel()
         {
             var paneel = Waterglas(simPagina, "Bediening", 14f);
+            onderPaneel = paneel.gameObject;
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
             Beschrijving(paneel, Levels[level].scene == 1 ? "level.1.zie" : "level.2.zie");
@@ -1291,6 +1360,7 @@ namespace WaterSim.UI
 
             // onderpaneel
             var paneel = Waterglas(simPagina, "Bediening", 14f);
+            onderPaneel = paneel.gameObject;
             var pv = Kolom((RectTransform)paneel.transform, 12, 8);
             pv.childAlignment = TextAnchor.LowerCenter;
 
@@ -1466,6 +1536,7 @@ namespace WaterSim.UI
             if (molecuul != null) molecuul.enabled = p == Pagina.Sim && MolecuulLevel;
             if (p == Pagina.Start)
             {
+                volledig = false;
                 if (vliegcamera != null) vliegcamera.enabled = false;
             }
             else
@@ -1560,6 +1631,7 @@ namespace WaterSim.UI
                 return;
             }
             if (vliegcamera != null && vliegcamera.DraaiOm) PasMolecuulcamera(false);
+            PasVolledigAan();
             if (zoomHouder != null && zoomHouder.gameObject.activeSelf == infoOpen) zoomHouder.gameObject.SetActive(!infoOpen);   // niet over het infovak
             if (infoVak != null && infoVak.gameObject.activeSelf != infoOpen)
             {
@@ -1569,7 +1641,7 @@ namespace WaterSim.UI
             foreach (var k in infoKnoppen) if (k != null) k.color = infoOpen ? Lin(OranjeL) : new Color(1f, 1f, 1f, 0.16f);
             if (formuleKaart != null)
             {
-                bool kaartZichtbaar = toonFormule && !infoOpen, knopZichtbaar = !toonFormule && !infoOpen;
+                bool kaartZichtbaar = toonFormule && !infoOpen && !volledig, knopZichtbaar = !toonFormule && !infoOpen && !volledig;
                 if (formuleKaart.gameObject.activeSelf != kaartZichtbaar || formuleDicht.gameObject.activeSelf != knopZichtbaar)
                 {
                     formuleKaart.gameObject.SetActive(kaartZichtbaar);
@@ -1657,7 +1729,7 @@ namespace WaterSim.UI
 
         int statusRichting; bool statusPlateau;
         Image verloopBoven, verloopOnder, dekBoven, dekOnder;
-        const float VerloopDekking = 0.9f;
+        const float VerloopDekking = 1f;
         static Sprite afloop;
 
         // verticaal verloop: bovenaan dekkend (alfa 0,85), naar onderen zacht (smoothstep) naar doorzichtig
@@ -1668,7 +1740,8 @@ namespace WaterSim.UI
             for (int y = 0; y < 64; y++)
             {
                 float f = y / 63f;                                 // 0 = onder (doorzichtig), 1 = boven (donker)
-                float a = f * f * (3f - 2f * f);
+                float g = Mathf.Pow(f, 0.7f);                     // lang donker, dan snel helder
+                float a = g * g * (3f - 2f * g);
                 tex.SetPixel(0, y, new Color(1f, 1f, 1f, VerloopDekking * a));
             }
             tex.Apply();
@@ -1679,13 +1752,13 @@ namespace WaterSim.UI
         void PasVerloopAan()
         {
             if (verloopBoven == null) return;
-            bool aan = pagina == Pagina.Sim && !MacroLevel && vrijRt != null && canvas != null;
+            bool aan = pagina == Pagina.Sim && !MacroLevel && !volledig && vrijRt != null && canvas != null;
             foreach (var v in new[] { verloopBoven, verloopOnder, dekBoven, dekOnder }) if (v.gameObject.activeSelf != aan) v.gameObject.SetActive(aan);
             if (!aan) return;
             vrijRt.GetWorldCorners(vrijHoeken);                   // overlay-canvas: wereld = schermpixels
             float s = canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
             float onder = vrijHoeken[0].y / s, boven = vrijHoeken[1].y / s, H = Screen.height / s, W = Screen.width / s;
-            float zacht = (boven - onder) * 0.28f;                // zo diep loopt de overgang het beeld in
+            float zachtBoven = (boven - onder) * 0.13f, zachtOnder = (boven - onder) * 0.18f;   // alleen een smalle rand wordt donker
             void Zet(Image img, float y0, float y1)
             {
                 var rt = img.rectTransform;
@@ -1694,12 +1767,12 @@ namespace WaterSim.UI
                 rt.sizeDelta = new Vector2(W, Mathf.Max(0f, y1 - y0));
             }
             Zet(dekBoven, boven, H);                              // achter de bovenbalk: dekkend
-            Zet(verloopBoven, boven - zacht, boven);              // daaronder: van donker naar helder
+            Zet(verloopBoven, boven - zachtBoven, boven);         // daaronder: van donker naar helder
             Zet(dekOnder, 0f, onder);                             // achter het paneel: dekkend
             var o = verloopOnder.rectTransform;                   // gespiegeld (schaal −1): pivot boven = onderkant in beeld
             o.pivot = new Vector2(0f, 1f);
             o.anchoredPosition = new Vector2(0f, onder);
-            o.sizeDelta = new Vector2(W, zacht);
+            o.sizeDelta = new Vector2(W, zachtOnder);
         }
         readonly Vector3[] vrijHoeken = new Vector3[4];
 
