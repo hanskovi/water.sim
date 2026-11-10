@@ -115,6 +115,11 @@ namespace WaterSim.UI
             if (vliegcamera == null) vliegcamera = FindAnyObjectByType<Vliegcamera>();
             if (UIBouw.Regular == null && ubuntuRegular != null) UIBouw.Regular = TMP_FontAsset.CreateFontAsset(ubuntuRegular);
             if (UIBouw.Vet == null && ubuntuVet != null) UIBouw.Vet = TMP_FontAsset.CreateFontAsset(ubuntuVet);
+            // klimaat: eerder gekozen, anders het land uit de instellingen van de telefoon (geen GPS, geen toestemming nodig)
+            string regio = PlayerPrefs.GetString("watersim.klimaat", "");
+            if (regio == "")
+                try { regio = System.Globalization.RegionInfo.CurrentRegion.TwoLetterISORegionName; } catch { regio = "NL"; }
+            klimaat = WaterSim.Sim.Klimaat.VoorLand(regio);
             molecuul = gameObject.AddComponent<Molecuulscene>();
             molecuul.bron = kristal; molecuul.font = UIBouw.Regular;
             molecuul.enabled = false;
@@ -855,6 +860,9 @@ namespace WaterSim.UI
         int vloeistofKeuze;          // 0 = zoet water, 1 = zeewater, 2 = alcohol
         float luchtT = -5f;
         int zonStand;                              // 0 = geen zon, 1 = winterzon, 2 = voorjaarszon
+        WaterSim.Sim.Klimaat klimaat;              // jaar-modus: lucht en zon van deze plaats
+        bool strengeWinter, klimaatLijstOpen;
+        Image klimaatLijst;
         bool jaarModus, opRots, aanHetSmelten;
         float gesmolten;
         double startDag;                           // dag van het jaar bij de start (jaar-modus: 1 oktober)
@@ -935,7 +943,8 @@ namespace WaterSim.UI
                 meerW.lIjs.outlineWidth = 0.2f; meerW.lIjs.outlineColor = new Color32(4, 16, 26, 230);
                 // lucht en datum linksboven, groot
                 tLucht = Tekst(vlak, "Lucht", "", 18f, Color.white, TextAlignmentOptions.TopLeft, true);
-                Hoek(tLucht.rectTransform, new Vector2(0f, 1f), new Vector2(12f, -6f), new Vector2(170f, 46f));
+                Hoek(tLucht.rectTransform, new Vector2(0f, 1f), new Vector2(12f, -6f), new Vector2(190f, 46f));
+                Klimaatlijst(vrij);
             }
         }
 
@@ -1013,13 +1022,24 @@ namespace WaterSim.UI
                 var jaar = Pilknop(rk.transform, Teksten.T("jaar"), () =>
                 {
                     jaarModus = !jaarModus;
-                    meer = new WaterSim.Sim.Meer(24, 6, 12);
-                    startDag = jaarModus ? 274 : 0;                  // jaar begint op 1 oktober
-                    if (jaarModus && zonStand == 0) zonStand = 2;
-                    if (meerW != null) meerW.meer = meer;
+                    StartJaar();
                 });
                 schakelaars.Add((jaar.img, jaar.t, () => jaarModus));
-                var opn = Pilknop(rk.transform, Teksten.T("opnieuw"), () => { meer = new WaterSim.Sim.Meer(24, 6, 12); if (meerW != null) meerW.meer = meer; });
+                var opn = Pilknop(rk.transform, Teksten.T("opnieuw"), StartJaar);
+
+                // klimaat: plaats kiezen (opent een lijst) en eventueel een strenge winter
+                var rkl = Rij(paneel.transform, "Klimaat", 32f, 6f);
+                var kk = Pilknop(rkl.transform, Teksten.T("klimaat." + klimaat.Sleutel), () => klimaatLijstOpen = !klimaatLijstOpen, 1.4f);
+                kk.t.fontSize = 12.5f; kk.t.margin = new Vector4(0f, 0f, 16f, 0f);
+                var kp = Icoon(kk.img.transform, "Pijl", PijlOmlaag(), Color.white);
+                Hoek(kp.rectTransform, new Vector2(1f, 0.5f), new Vector2(-9f, 0f), new Vector2(11f, 11f));
+                schakelaars.Add((kk.img, kk.t, () => klimaatLijstOpen));
+                if (klimaat.HeeftStrengeWinter)
+                {
+                    var sw = Pilknop(rkl.transform, Teksten.T("streng"), () => { strengeWinter = !strengeWinter; if (jaarModus) StartJaar(); }, 1f);
+                    sw.t.fontSize = 12.5f;
+                    schakelaars.Add((sw.img, sw.t, () => strengeWinter));
+                }
 
                 var r = Rij(paneel.transform, "Lucht", 34f, 10f);
                 var lab = Tekst(r.transform, "Label", Teksten.T("lucht"), 13.5f, Color.white);
@@ -1053,6 +1073,54 @@ namespace WaterSim.UI
         }
 
         TextMeshProUGUI tLuchtWaarde;
+
+        // nieuw meertje; in de jaar-modus begint het in de herfst van het gekozen klimaat
+        void StartJaar()
+        {
+            startDag = jaarModus ? klimaat.StartDag : 0;
+            double t0 = jaarModus ? System.Math.Max(4.0, klimaat.Lucht(startDag, strengeWinter) + 2) : 12;
+            meer = new WaterSim.Sim.Meer(24, 6, t0);
+            if (jaarModus && zonStand == 0) zonStand = 2;
+            if (meerW != null) meerW.meer = meer;
+        }
+
+        // keuzelijst met plaatsen, over het beeld heen
+        void Klimaatlijst(RectTransform vrij)
+        {
+            var kleur = Lin(Hex("05293A")); kleur.a = 0.94f;
+            klimaatLijst = Vlak(vrij, "Klimaatlijst", kleur, 14f);
+            Vul(klimaatLijst.rectTransform, 0f, 6f, 0f, 6f);
+            var kv = Kolom((RectTransform)klimaatLijst.transform, 12, 6);
+            kv.childAlignment = TextAnchor.UpperLeft;
+            var kop = Rij(klimaatLijst.transform, "Kop", 28f, 8f);
+            var titel = Tekst(kop.transform, "Titel", "<b>" + Teksten.T("klimaat.kies") + "</b>", 14.5f, Color.white);
+            LE(titel.gameObject, flexW: 1f);
+            var sluit = Vlak(kop.transform, "Sluiten", KnopGlas, 8f);
+            LE(sluit.gameObject, prefW: 30f);
+            var x = Tekst(sluit.transform, "x", "×", 20f, Color.white, TextAlignmentOptions.Center);
+            Vul(x.rectTransform, 0, 2, 0, 0);
+            Knop(sluit, () => klimaatLijstOpen = false);
+            var alle = WaterSim.Sim.Klimaat.Alle;
+            for (int i = 0; i < alle.Count; i += 2)
+            {
+                var rij = Rij(klimaatLijst.transform, "Rij", 30f, 6f);
+                for (int j = i; j < System.Math.Min(i + 2, alle.Count); j++)
+                {
+                    var k = alle[j];
+                    var p = Pilknop(rij.transform, Teksten.T("klimaat." + k.Sleutel), () =>
+                    {
+                        klimaat = k; PlayerPrefs.SetString("watersim.klimaat", k.Land);
+                        if (!k.HeeftStrengeWinter) strengeWinter = false;
+                        jaarModus = true; StartJaar();
+                        klimaatLijstOpen = false; Bouw();
+                    });
+                    p.t.fontSize = 12.5f;
+                    schakelaars.Add((p.img, p.t, () => klimaat == k));
+                }
+                if (i + 1 >= alle.Count) { var leeg = Maak("Leeg", rij.transform); LE(leeg.gameObject, flexW: 1f); }
+            }
+            klimaatLijst.gameObject.SetActive(klimaatLijstOpen);
+        }
 
         // "15 jan" uit de dag van het jaar (0 = 1 januari)
         static string Datum(double dag)
@@ -1106,8 +1174,9 @@ namespace WaterSim.UI
             else if (macroModus == 1 && meerW != null && meer != null)
             {
                 double dag = (startDag + meer.Tijd / 86400.0) % WaterSim.Sim.Seizoen.DagenPerJaar;
-                if (jaarModus) luchtT = (float)WaterSim.Sim.Seizoen.Lucht(dag);
-                meer.Zon = zonStand == 0 ? 0 : jaarModus ? WaterSim.Sim.Seizoen.Zon(dag)
+                if (jaarModus) luchtT = (float)klimaat.Lucht(dag, strengeWinter);
+                if (klimaatLijst != null && klimaatLijst.gameObject.activeSelf != klimaatLijstOpen) klimaatLijst.gameObject.SetActive(klimaatLijstOpen);
+                meer.Zon = zonStand == 0 ? 0 : jaarModus ? klimaat.Zon(dag)
                          : zonStand == 1 ? WaterSim.Sim.Seizoen.ZonWinter : WaterSim.Sim.Seizoen.ZonVoorjaar;
                 if (tZonKnop != null) tZonKnop.text = Teksten.T(zonStand == 0 ? "zon.uit" : jaarModus ? "zon.jaar" : zonStand == 1 ? "zon.winter" : "zon.voorjaar");
                 if (luchtSchuif != null)
@@ -1136,7 +1205,8 @@ namespace WaterSim.UI
 
                 if (tLucht != null)
                     tLucht.text = $"{Teksten.T("lucht")} {Teksten.Graden(luchtT, 0, true)}\n<size=75%><color=#B9DCEA>" +
-                                  (jaarModus ? Datum(dag) : $"{Teksten.T("dag.hoofd")} {(int)(meer.Tijd / 86400.0)}") + "</color></size>";
+                                  (jaarModus ? Datum(dag) + " · " + Teksten.T("plaats." + klimaat.Sleutel) + (strengeWinter ? " · " + Teksten.T("streng.kort") : "")
+                                             : $"{Teksten.T("dag.hoofd")} {(int)(meer.Tijd / 86400.0)}") + "</color></size>";
                 if (meerW.lBodem != null) meerW.lBodem.text = $"{Teksten.T("bodem")}: <b>{Teksten.Graden(meer.Bodem, 1)}</b>";
                 if (tLuchtWaarde != null) tLuchtWaarde.text = Teksten.Graden(luchtT, 0, true);
 

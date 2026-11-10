@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using WaterSim.Sim;
 
@@ -120,6 +121,42 @@ namespace WaterSim.Tests
             for (int d = 0; d < 15; d++) zon.Stap(Dag, -1);
             Assert.That(zon.NettoPerDag, Is.LessThanOrEqualTo(0.0005), "geen netto groei bij −1 °C met zon");
             Assert.That(zon.Toestand, Is.Not.EqualTo(Meer.IJstoestand.Groeit));
+        }
+
+        // een jaar in dit klimaat, vanaf de herfst; geeft de dikste ijslaag en de laagste bodemtemperatuur onder ijs
+        static double DiksteIJs(Klimaat k, bool streng)
+        {
+            var m = new Meer(24, 6, Math.Max(4, k.Lucht(k.StartDag) + 2));
+            double max = 0;
+            for (int d = 0; d < 365; d++)
+            {
+                double dag = (k.StartDag + d) % Seizoen.DagenPerJaar;
+                m.Zon = k.Zon(dag);
+                m.Stap(Dag, k.Lucht(dag, streng));
+                max = Math.Max(max, m.Ijsdikte);
+            }
+            return max;
+        }
+
+        [Test]
+        public void KlimaatVolgtHetHalfrond()
+        {
+            var nl = Klimaat.VoorLand("NL"); var nz = Klimaat.VoorLand("NZ");
+            Assert.That(nl.Lucht(15), Is.LessThan(nl.Lucht(196)), "noorden: januari kouder dan juli");
+            Assert.That(nz.Lucht(196), Is.LessThan(nz.Lucht(15)), "zuiden: juli kouder dan januari");
+            Assert.That(nl.Zon(171), Is.GreaterThan(4 * nl.Zon(354)), "NL: juni veel meer zon dan december");
+            Assert.That(nz.Zon(354), Is.GreaterThan(nz.Zon(171)), "NZ: december meer zon dan juni");
+            Assert.That(Klimaat.Zonlicht(52, 171), Is.EqualTo(230).Within(30), "NL juni ≈ 230 W/m² aan de grond");
+            Assert.That(Klimaat.VoorLand("XX"), Is.SameAs(nl), "onbekend land: Nederland");
+        }
+
+        [Test]
+        public void IJsHangtAfVanHetKlimaat()
+        {
+            Assert.That(DiksteIJs(Klimaat.VoorLand("NL"), false), Is.LessThan(0.02), "gewone Nederlandse winter: (bijna) geen ijs");
+            Assert.That(DiksteIJs(Klimaat.VoorLand("NL"), true), Is.GreaterThan(0.10), "strenge winter (1963): schaatsijs");
+            Assert.That(DiksteIJs(Klimaat.VoorLand("CA"), false), Is.GreaterThan(0.3), "Ottawa: dik ijs");
+            Assert.That(DiksteIJs(Klimaat.VoorLand("SG"), false), Is.EqualTo(0), "Singapore: nooit ijs");
         }
 }
 }
