@@ -281,18 +281,20 @@ namespace WaterSim.UI
         float laatsteTijd;
 
         /// <summary>
-        /// Schaatsers volgens de schaatsmeter: &lt; 5 cm niemand (bordje), 5–10 cm één voorzichtige schaatser,
-        /// 10–15 cm een paar, vanaf 15 cm een toertocht in een lint. Smelt het ijs, dan gaat iedereen eraf.
+        /// Schaatsers volgens de ijsdikte (richtlijn): &lt; 5 cm niemand (bordje), 5–10 cm één voorzichtige schaatser,
+        /// 10–15 cm een paar, vanaf 15 cm een toertocht in een lint. Bij dooi is ijs minder sterk ("rot" ijs):
+        /// dan gelden de grenzen 3 cm hoger, dus onder ≈ 8 cm gaat iedereen eraf.
         /// </summary>
         void Schaatsers(VertexHelper vh, float x0, float x1, float ijs, float t)
         {
             float dt = Mathf.Clamp(t - laatsteTijd, 0f, 0.1f); laatsteTijd = t;
             double cm = meer.Ijsdikte * 100;
             var tst = meer.Toestand;
-            bool smelt = meer.Smeltwater > 0.0005 || tst == Meer.IJstoestand.SmeltBoven || tst == Meer.IJstoestand.SmeltOnder || tst == Meer.IJstoestand.SmeltBeide;
-            bool toertocht = cm >= 15 && !smelt;
-            int aantal = smelt || cm < 5 ? 0 : cm < 10 ? 1 : cm < 15 ? 3 : 9;
-            if (meer.Ijsdikte > 0.003 && (cm < 5 || smelt)) Bordje(vh, new Vector2(x1 - 22f, ijs));
+            bool dooi = meer.Smeltwater > 0.0005 || tst == Meer.IJstoestand.SmeltBoven || tst == Meer.IJstoestand.SmeltOnder || tst == Meer.IJstoestand.SmeltBeide;
+            double nodig = dooi ? 3 : 0;                                   // bij dooi 3 cm extra marge
+            bool toertocht = cm >= 15 + nodig;
+            int aantal = cm < 5 + nodig ? 0 : cm < 10 + nodig ? 1 : cm < 15 + nodig ? 3 : 9;
+            if (meer.Ijsdikte > 0.003 && aantal == 0) Bordje(vh, new Vector2(x1 - 22f, ijs));
             float breed = x1 - x0;
             for (int i = 0; i < MaxSchaatsers; i++)
             {

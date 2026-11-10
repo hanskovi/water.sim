@@ -858,12 +858,11 @@ namespace WaterSim.UI
         bool jaarModus, opRots, aanHetSmelten;
         float gesmolten;
         double startDag;                           // dag van het jaar bij de start (jaar-modus: 1 oktober)
-        TextMeshProUGUI tSchaats, tSmeltKnop, tZonKnop;
-        Image schaatsPil;
+        TextMeshProUGUI tSmeltKnop, tZonKnop;
         Glasweergave glasW;
         Meerweergave meerW;
         Slider luchtSchuif;
-        TextMeshProUGUI tLucht, tMeerStatus, tGlasStatus;
+        TextMeshProUGUI tLucht, tGlasStatus;
         const float DagenPerSeconde = 1f;          // model: 1 seconde = 1 dag
         const float DagenPerSecondeJaar = 3f;      // jaar-modus: 1 seconde = 3 dagen (een jaar in ruim 2 minuten)
 
@@ -1047,14 +1046,7 @@ namespace WaterSim.UI
                 LE(w.gameObject, prefW: 58f);
                 tLuchtWaarde = w;
 
-                var r2 = Rij(paneel.transform, "Meerstatus", 26f, 8f);
-                tMeerStatus = Tekst(r2.transform, "Status", "", 13f, IJsTekst);
-                LE(tMeerStatus.gameObject, flexW: 1f);
-                // schaatsmeter: kun je erop?
-                schaatsPil = Vlak(r2.transform, "Schaatsen", Color.white, 8f);
-                LE(schaatsPil.gameObject, prefW: 150f);
-                tSchaats = Tekst(schaatsPil.transform, "Tekst", "", 12f, Color.white, TextAlignmentOptions.Center, true);
-                Vul(tSchaats.rectTransform, 6, 0, 6, 0);
+                // de ijsdikte en de schaatsers staan in beeld; geen aparte statusregel meer
             }
             var noot = Tekst(paneel.transform, "Model", Teksten.T(macroModus == 0 ? "model.glas" : macroModus == 2 ? "model.pool" : "model.meer"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
             LE(noot.gameObject, prefH: 28f);
@@ -1141,22 +1133,13 @@ namespace WaterSim.UI
                 meerW.lIjs.text = meer.Ijsdikte > 0.003
                     ? "<b>" + string.Format(Teksten.T("meer.ijs"), Teksten.Getal(meer.Ijsdikte * 100, "0")) + "</b>" + (waar != "" ? "\n" + Teksten.T(waar) + snelheid : "")
                     : "";
-                // schaatsmeter (richtlijn): < 5 cm niet op, 5–10 één persoon, 10–15 schaatsen, ≥ 15 toertocht
-                double cm = meer.Ijsdikte * 100;
-                if (schaatsPil != null)
-                {
-                    schaatsPil.gameObject.SetActive(cm >= 0.5);
-                    int stap = cm < 5 ? 0 : cm < 10 ? 1 : cm < 15 ? 2 : 3;
-                    tSchaats.text = Teksten.T("schaats." + stap);
-                    schaatsPil.color = Lin(Hex(stap == 0 ? "D9483B" : stap == 1 ? "E8902E" : "3E9E5A"));
-                }
+
                 if (tLucht != null)
                     tLucht.text = $"{Teksten.T("lucht")} {Teksten.Graden(luchtT, 0, true)}\n<size=75%><color=#B9DCEA>" +
                                   (jaarModus ? Datum(dag) : $"{Teksten.T("dag.hoofd")} {(int)(meer.Tijd / 86400.0)}") + "</color></size>";
                 if (meerW.lBodem != null) meerW.lBodem.text = $"{Teksten.T("bodem")}: <b>{Teksten.Graden(meer.Bodem, 1)}</b>";
                 if (tLuchtWaarde != null) tLuchtWaarde.text = Teksten.Graden(luchtT, 0, true);
-                if (tMeerStatus != null)
-                    tMeerStatus.text = meer.Ijsdikte > 0.003 ? string.Format(Teksten.T("meer.ijsstatus"), Teksten.Getal(meer.Ijsdikte * 100, "0")) : Teksten.T("meer.geenijs");
+
             }
         }
 
