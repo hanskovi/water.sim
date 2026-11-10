@@ -46,8 +46,35 @@ namespace WaterSim.Sim
         public double Smeltwater;
         /// <summary>Opgeteld sinds de start (m ijs): aangegroeid aan de onderkant, gesmolten aan boven- en onderkant.</summary>
         public double GegroeidOnder, GesmoltenBoven, GesmoltenOnder;
-        /// <summary>Wat het ijs de laatste stap deed: +1 groeit (onder), −1 smelt (boven), 0 niets.</summary>
+        /// <summary>Wat het ijs de laatste stap aan de bovenkant deed: +1 groeit (onder), −1 smelt (boven), 0 niets.</summary>
         public int IjsRichting;
+
+        /// <summary>Gemiddelde snelheden over ongeveer de laatste dag (m ijs per dag): aangroei onder, smelten boven en onder.</summary>
+        public double GroeiOnderPerDag, SmeltBovenPerDag, SmeltOnderPerDag;
+        /// <summary>Netto verandering van de ijsdikte (m per dag, + = dikker).</summary>
+        public double NettoPerDag => GroeiOnderPerDag - SmeltBovenPerDag - SmeltOnderPerDag;
+
+        public enum IJstoestand { GeenIJs, Groeit, SmeltBoven, SmeltOnder, SmeltBeide, Gelijk }
+
+        /// <summary>Wat er netto met het ijs gebeurt (gemiddeld over ongeveer een dag).</summary>
+        public IJstoestand Toestand
+        {
+            get
+            {
+                if (Ijsdikte <= 0) return IJstoestand.GeenIJs;
+                const double drempel = 0.0005;                       // 0,5 mm per dag
+                double netto = NettoPerDag;
+                double smelt = SmeltBovenPerDag + SmeltOnderPerDag;             // een kant telt mee vanaf een kwart van het smelten
+                bool boven = SmeltBovenPerDag > Math.Max(drempel, 0.25 * smelt), onder = SmeltOnderPerDag > Math.Max(drempel, 0.25 * smelt);
+                if (netto > drempel) return IJstoestand.Groeit;
+                if (netto < -drempel)
+                {
+                    if (boven && onder) return IJstoestand.SmeltBeide;
+                    return SmeltOnderPerDag > SmeltBovenPerDag ? IJstoestand.SmeltOnder : IJstoestand.SmeltBoven;
+                }
+                return IJstoestand.Gelijk;
+            }
+        }
 
         readonly double dz;
         static double C => Constanten.SoortelijkeWarmteWater * 1000 * 1000;   // J/(m³·K): 4,18 J/(g·K) · 10⁶ g/m³
@@ -68,8 +95,18 @@ namespace WaterSim.Sim
         {
             int n = Math.Max(1, (int)Math.Ceiling(dt / 600.0));
             double h = dt / n;
+            double g0 = GegroeidOnder, b0 = GesmoltenBoven, o0 = GesmoltenOnder;
             for (int k = 0; k < n; k++) Deelstap(h, tLucht);
             Tijd += dt;
+            // snelheden glad maken over ongeveer een dag (zodat het label niet heen en weer springt)
+            if (dt > 0)
+            {
+                double a = 1 - Math.Exp(-dt / 86400.0), perDag = 86400.0 / dt;
+                GroeiOnderPerDag += a * ((GegroeidOnder - g0) * perDag - GroeiOnderPerDag);
+                SmeltBovenPerDag += a * ((GesmoltenBoven - b0) * perDag - SmeltBovenPerDag);
+                SmeltOnderPerDag += a * ((GesmoltenOnder - o0) * perDag - SmeltOnderPerDag);
+                if (Ijsdikte <= 0) GroeiOnderPerDag = SmeltBovenPerDag = SmeltOnderPerDag = 0;
+            }
         }
 
         void Deelstap(double dt, double tLucht)

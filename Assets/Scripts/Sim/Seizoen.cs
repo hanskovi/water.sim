@@ -10,6 +10,8 @@ namespace WaterSim.Sim
     public static class Seizoen
     {
         public const double DagenPerJaar = 365;
+        /// <summary>Daggemiddeld zonlicht (W/m²) van een heldere winterdag en voorjaarsdag (ordegrootte, Nederland).</summary>
+        public const double ZonWinter = 40, ZonVoorjaar = 150;
 
         /// <summary>Gemiddelde luchttemperatuur (°C) op deze dag van het jaar.</summary>
         public static double Lucht(double dag) => 7 - 13 * Math.Cos(2 * Math.PI * (dag - 15) / DagenPerJaar);

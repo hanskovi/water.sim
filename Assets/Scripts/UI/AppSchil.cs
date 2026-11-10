@@ -852,11 +852,11 @@ namespace WaterSim.UI
         Poolweergave poolW;
         int vloeistofKeuze;          // 0 = zoet water, 1 = zeewater, 2 = alcohol
         float luchtT = -5f;
-        bool metZon, jaarModus, opRots, aanHetSmelten;
+        int zonStand;                              // 0 = geen zon, 1 = winterzon, 2 = voorjaarszon
+        bool jaarModus, opRots, aanHetSmelten;
         float gesmolten;
         double startDag;                           // dag van het jaar bij de start (jaar-modus: 1 oktober)
-        const float ZonHandmatig = 150f;           // W/m², zonlicht als de zon aan staat zonder jaar-modus
-        TextMeshProUGUI tSchaats, tSmeltKnop;
+        TextMeshProUGUI tSchaats, tSmeltKnop, tZonKnop;
         Image schaatsPil;
         Glasweergave glasW;
         Meerweergave meerW;
@@ -1001,14 +1001,15 @@ namespace WaterSim.UI
             else
             {
                 var rk = Rij(paneel.transform, "Knoppen", 34f, 6f);
-                var zon = Pilknop(rk.transform, Teksten.T("zon"), () => metZon = !metZon);
-                schakelaars.Add((zon.img, zon.t, () => metZon));
+                var zon = Pilknop(rk.transform, "", () => zonStand = (zonStand + 1) % 3);   // uit → winterzon → voorjaarszon
+                tZonKnop = zon.t;
+                schakelaars.Add((zon.img, zon.t, () => zonStand > 0));
                 var jaar = Pilknop(rk.transform, Teksten.T("jaar"), () =>
                 {
                     jaarModus = !jaarModus;
                     meer = new WaterSim.Sim.Meer(24, 6, 12);
                     startDag = jaarModus ? 274 : 0;                  // jaar begint op 1 oktober
-                    if (jaarModus) metZon = true;
+                    if (jaarModus && zonStand == 0) zonStand = 2;
                     if (meerW != null) meerW.meer = meer;
                 });
                 schakelaars.Add((jaar.img, jaar.t, () => jaarModus));
@@ -1100,7 +1101,9 @@ namespace WaterSim.UI
             {
                 double dag = (startDag + meer.Tijd / 86400.0) % WaterSim.Sim.Seizoen.DagenPerJaar;
                 if (jaarModus) luchtT = (float)WaterSim.Sim.Seizoen.Lucht(dag);
-                meer.Zon = !metZon ? 0 : jaarModus ? WaterSim.Sim.Seizoen.Zon(dag) : ZonHandmatig;
+                meer.Zon = zonStand == 0 ? 0 : jaarModus ? WaterSim.Sim.Seizoen.Zon(dag)
+                         : zonStand == 1 ? WaterSim.Sim.Seizoen.ZonWinter : WaterSim.Sim.Seizoen.ZonVoorjaar;
+                if (tZonKnop != null) tZonKnop.text = Teksten.T(zonStand == 0 ? "zon.uit" : jaarModus ? "zon.jaar" : zonStand == 1 ? "zon.winter" : "zon.voorjaar");
                 if (luchtSchuif != null)
                 {
                     luchtSchuif.interactable = !jaarModus;
@@ -1114,8 +1117,16 @@ namespace WaterSim.UI
                     int laag = Mathf.Clamp((int)(d / meer.Diepte * meer.Lagen), 0, meer.Lagen - 1);
                     t.text = $"{Teksten.Getal(d, "0.#")} m · <b>{Teksten.Graden(meer.T[laag], 1)}</b>";
                 }
-                string waar = meer.IjsRichting > 0 ? Teksten.T("meer.groeit") : meer.IjsRichting < 0 ? Teksten.T("meer.smelt") : "";
-                meerW.lIjs.text = meer.Ijsdikte > 0.003 ? string.Format(Teksten.T("meer.ijs"), Teksten.Getal(meer.Ijsdikte * 100, "0")) + (waar != "" ? " · " + waar : "") : "";
+                // wat er netto met het ijs gebeurt (gemiddeld over een dag), met de snelheid
+                var tst = meer.Toestand;
+                string waar = tst == WaterSim.Sim.Meer.IJstoestand.Groeit ? "meer.groeit" : tst == WaterSim.Sim.Meer.IJstoestand.SmeltBoven ? "meer.smelt"
+                            : tst == WaterSim.Sim.Meer.IJstoestand.SmeltOnder ? "meer.smeltonder" : tst == WaterSim.Sim.Meer.IJstoestand.SmeltBeide ? "meer.smeltbeide"
+                            : tst == WaterSim.Sim.Meer.IJstoestand.Gelijk ? "meer.gelijk" : "";
+                double cmPerDag = meer.NettoPerDag * 100;
+                string snelheid = System.Math.Abs(cmPerDag) >= 0.05 ? $" ({(cmPerDag > 0 ? "+" : "−")}{Teksten.Getal(System.Math.Abs(cmPerDag), "0.0")} cm/{Teksten.T("dag")})" : "";
+                meerW.lIjs.text = meer.Ijsdikte > 0.003
+                    ? string.Format(Teksten.T("meer.ijs"), Teksten.Getal(meer.Ijsdikte * 100, "0")) + (waar != "" ? " · " + Teksten.T(waar) + snelheid : "")
+                    : "";
                 // schaatsmeter (richtlijn): < 5 cm niet op, 5–10 één persoon, 10–15 schaatsen, ≥ 15 toertocht
                 double cm = meer.Ijsdikte * 100;
                 if (schaatsPil != null)

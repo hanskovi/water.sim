@@ -293,6 +293,21 @@ namespace WaterSim.UI
                 float y1 = boven - i * dz, y2 = boven - (i + 1) * dz - 0.5f;
                 Blok(vh, x0, y2, x1, y1, Kleur(meer.T[i]));
             }
+            // zonlicht in het water: zachte gele gloed die naar de diepte toe uitdooft (zoals het model rekent)
+            if (meer.Zon > 1)
+            {
+                bool metIjs = meer.Ijsdikte > 0;
+                double licht = meer.Zon * (1 - (metIjs ? meer.AlbedoIjs : meer.AlbedoWater)) * (metIjs ? System.Math.Exp(-meer.Ijsdikte / meer.LichtdiepteIjs) : 1);
+                float sterkte = Mathf.Clamp01((float)(licht / 150.0));
+                for (int i = 0; i < meer.Lagen; i++)
+                {
+                    float z = (i + 0.5f) * (float)(meer.Diepte / meer.Lagen);
+                    float a = 0.3f * sterkte * Mathf.Exp(-z / (float)meer.LichtdiepteWater);
+                    if (a < 0.01f) break;
+                    Blok(vh, x0, boven - (i + 1) * dz, x1, boven - i * dz, new Color(1f, 0.88f, 0.45f, a));
+                }
+            }
+
             // ijs: 92 % onder het waterniveau, 8 % erboven
             float d = (float)meer.Ijsdikte * schaal;
             if (d > 0.3f)

@@ -100,5 +100,26 @@ namespace WaterSim.Tests
             Assert.That(Drijven.Niveaustijging(100, 50, ri, rw, rw, false, 1), Is.EqualTo(100 * ri / rw / 50).Within(1e-9), "landijs: alles erbij");
             Assert.That(Drijven.Niveaustijging(100, 50, ri, Constanten.DichtheidEthanol, rw, true, 1), Is.LessThan(0), "gezonken ijs in alcohol: niveau daalt");
         }
+
+        [Test]
+        public void ToestandVanHetIJsVolgtDeEnergiebalans()
+        {
+            var m = new Meer(24, 6, 4);
+            for (int d = 0; d < 10; d++) m.Stap(Dag, -10);
+            Assert.That(m.Toestand, Is.EqualTo(Meer.IJstoestand.Groeit), "vorst zonder zon: groeit");
+
+            var dooi = new Meer(24, 6, 4);
+            for (int d = 0; d < 20; d++) dooi.Stap(Dag, -10);
+            for (int d = 0; d < 2; d++) dooi.Stap(Dag, 5);
+            Assert.That(dooi.Toestand, Is.EqualTo(Meer.IJstoestand.SmeltBoven), "dooi zonder zon: smelt aan de bovenkant");
+
+            // lichte vorst met voorjaarszon: het licht verwarmt het water, het ijs groeit netto niet meer
+            var zon = new Meer(24, 6, 4);
+            for (int d = 0; d < 6; d++) zon.Stap(Dag, -6);
+            zon.Zon = Seizoen.ZonVoorjaar;
+            for (int d = 0; d < 15; d++) zon.Stap(Dag, -1);
+            Assert.That(zon.NettoPerDag, Is.LessThanOrEqualTo(0.0005), "geen netto groei bij −1 °C met zon");
+            Assert.That(zon.Toestand, Is.Not.EqualTo(Meer.IJstoestand.Groeit));
+        }
 }
 }
