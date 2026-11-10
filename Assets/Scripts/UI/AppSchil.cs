@@ -175,6 +175,19 @@ namespace WaterSim.UI
                 achtergrondLagen.Add(laag);
             }
 
+            // donker verloop boven en onder over het 3D-beeld, zodat de menu's rustig zijn en het midden helder blijft
+            verloopBoven = Maak("VerloopBoven", go.transform).gameObject.AddComponent<Image>();
+            verloopOnder = Maak("VerloopOnder", go.transform).gameObject.AddComponent<Image>();
+            foreach (var v in new[] { verloopBoven, verloopOnder })
+            {
+                v.sprite = Afloop(); v.raycastTarget = false;
+                var c = kristal != null ? kristal.achtergrond : new Color(0.04f, 0.08f, 0.125f);
+                v.color = new Color(c.r, c.g, c.b, 1f);
+                v.rectTransform.anchorMin = v.rectTransform.anchorMax = Vector2.zero;
+                v.gameObject.SetActive(false);
+            }
+            verloopOnder.rectTransform.localScale = new Vector3(1f, -1f, 1f);       // gespiegeld: donker onderaan
+
             veilig = Maak("VeiligeZone", go.transform);
             kolom = Maak("Kolom", veilig);
             startPagina = Maak("Startscherm", kolom); Vul(startPagina);
@@ -1539,6 +1552,7 @@ namespace WaterSim.UI
         {
             if (Screen.safeArea != laatsteSafe || Screen.width != (int)laatsteScherm.x || Screen.height != (int)laatsteScherm.y) PasSchermAan();
             PasKolomAan();
+            PasVerloopAan();                                   // ook op het startscherm: daar zet het zich uit
             if (pagina == Pagina.Start) PasGolfAan();
             if (kristal == null || kristal.Model == null) return;
 
@@ -1645,6 +1659,44 @@ namespace WaterSim.UI
         }
 
         int statusRichting; bool statusPlateau;
+        Image verloopBoven, verloopOnder;
+        static Sprite afloop;
+
+        // verticaal verloop: bovenaan dekkend (alfa 0,85), naar onderen zacht (smoothstep) naar doorzichtig
+        static Sprite Afloop()
+        {
+            if (afloop != null) return afloop;
+            var tex = new Texture2D(1, 64, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            for (int y = 0; y < 64; y++)
+            {
+                float f = y / 63f;                                 // 0 = onder (doorzichtig), 1 = boven (donker)
+                float a = f * f * (3f - 2f * f);
+                tex.SetPixel(0, y, new Color(1f, 1f, 1f, 0.85f * a));
+            }
+            tex.Apply();
+            return afloop = Sprite.Create(tex, new Rect(0, 0, 1, 64), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        // het verloop volgt de echte randen van bovenbalk en paneel: van de schermrand tot een stukje het vrije beeld in
+        void PasVerloopAan()
+        {
+            bool aan = pagina == Pagina.Sim && !MacroLevel && vrijRt != null && canvas != null;
+            if (verloopBoven == null) return;
+            verloopBoven.gameObject.SetActive(aan); verloopOnder.gameObject.SetActive(aan);
+            if (!aan) return;
+            vrijRt.GetWorldCorners(vrijHoeken);                   // overlay-canvas: wereld = schermpixels
+            float s = canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
+            float onder = vrijHoeken[0].y, boven = vrijHoeken[1].y, zacht = (boven - onder) * 0.22f;
+            float breedte = Screen.width / s;
+            var b = verloopBoven.rectTransform;
+            b.pivot = new Vector2(0f, 1f);
+            b.anchoredPosition = new Vector2(0f, Screen.height / s);
+            b.sizeDelta = new Vector2(breedte, (Screen.height - (boven - zacht)) / s);
+            var o = verloopOnder.rectTransform;
+            o.pivot = new Vector2(0f, 1f);                        // gespiegeld: pivot boven = onderkant in beeld
+            o.anchoredPosition = new Vector2(0f, 0f);
+            o.sizeDelta = new Vector2(breedte, (onder + zacht) / s);
+        }
         readonly Vector3[] vrijHoeken = new Vector3[4];
 
         // het draaipunt midden in het vrije stuk tussen bovenbalk en paneel; met 'afstand' ook passend inzoomen
