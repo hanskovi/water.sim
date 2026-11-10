@@ -913,7 +913,7 @@ namespace WaterSim.UI
                 for (int i = 0; i < 2; i++)
                 {
                     var z = Maak(i == 0 ? "Inzoom ijs" : "Inzoom water", vlak);
-                    Hoek(z, new Vector2(i == 0 ? 0f : 1f, 0f), new Vector2(i == 0 ? 6f : -6f, 22f), new Vector2(92f, 92f));
+                    Hoek(z, new Vector2(i == 0 ? 0f : 1f, 0f), new Vector2(i == 0 ? 4f : -4f, 22f), new Vector2(108f, 108f));
                     z.gameObject.AddComponent<CanvasRenderer>();
                     var g = z.gameObject.AddComponent<Inzoom>();
                     g.water = i == 1; g.raycastTarget = false;
@@ -972,21 +972,14 @@ namespace WaterSim.UI
             Beschrijving(paneel, macroModus == 0 ? "level.5.zie.glas" : macroModus == 2 ? "level.5.zie.pool" : "level.5.zie.meer");
 
             void ZetModus(int m) { macroModus = m; PlayerPrefs.SetInt("watersim.macro", m); gesmolten = 0f; aanHetSmelten = false; Bouw(); }
+            // drie tabs: eerst het waarom (glas), dan de gevolgen op aarde
             var tabs = Rij(paneel.transform, "Modus", 34f, 6f);
-            var tIjs = Pilknop(tabs.transform, Teksten.T("ijsmassa"), () => { if (macroModus == 1) ZetModus(PlayerPrefs.GetInt("watersim.ijsmassa", 0)); });
-            schakelaars.Add((tIjs.img, tIjs.t, () => macroModus != 1));
-            var tMeer = Pilknop(tabs.transform, Teksten.T("meer"), () => ZetModus(1));
-            schakelaars.Add((tMeer.img, tMeer.t, () => macroModus == 1));
-            if (macroModus != 1)
+            foreach (var (m, sleutel) in new[] { (0, "tab.drijft"), (2, "poolkappen"), (1, "meer") })
             {
-                var sub = Rij(paneel.transform, "IJsmassa", 30f, 6f);
-                for (int i = 0; i < 2; i++)
-                {
-                    int m = i == 0 ? 0 : 2;
-                    var p = Pilknop(sub.transform, Teksten.T(i == 0 ? "glas" : "poolkappen"), () => { PlayerPrefs.SetInt("watersim.ijsmassa", m); ZetModus(m); });
-                    p.t.fontSize = 12.5f;
-                    schakelaars.Add((p.img, p.t, () => macroModus == m));
-                }
+                int mm = m;
+                var p = Pilknop(tabs.transform, Teksten.T(sleutel), () => { if (macroModus != mm) ZetModus(mm); });
+                p.t.fontSize = 13f;
+                schakelaars.Add((p.img, p.t, () => macroModus == mm));
             }
             if (macroModus == 2)
             {
