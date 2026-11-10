@@ -10,9 +10,11 @@ namespace WaterSim.Sim
     ///   Omdat water bij ≈ 4 °C het zwaarst is, koelt het hele meer eerst af tot 4 °C;
     ///   daarna blijft kouder water bovenop liggen en bevriest het oppervlak.
     /// - IJs groeit aan de onderkant: de warmte gaat door het ijs naar de lucht (warmtegeleiding van ijs).
-    /// - Een beetje menging (wind, stroming) houdt het verloop geleidelijk.
-    /// Eenheden: diepte in m, temperatuur in °C, tijd in s, ijsdikte in m.
-    /// Model: geen zon, geen sneeuw, geen grondwater; de bodem laat geen warmte door.
+    /// - Bij dooi smelt het ijs aan de bovenkant (warme lucht, zon); er komt smeltwater op te staan.
+    ///   Van onderen smelt het alleen door water dat warmer is dan 0 °C (bv. opgewarmd door licht door het ijs).
+    /// - Zonlicht dringt in het water en wordt naar de diepte toe minder (uitdoving); wind mengt de bovenste laag.
+    /// Eenheden: diepte in m, temperatuur in °C, tijd in s, ijsdikte in m, zon in W/m² (daggemiddelde).
+    /// Model: geen sneeuw, geen grondwater, geen in- of uitstroom; de bodem laat geen warmte door.
     /// </summary>
     public class Meer
     {
@@ -25,10 +27,27 @@ namespace WaterSim.Sim
         /// <summary>Verstreken modeltijd (s).</summary>
         public double Tijd;
 
-        /// <summary>Warmteoverdracht lucht ↔ oppervlak (W/(m²·K)); model, inclusief wind.</summary>
-        public double Warmteoverdracht = 15;
+        /// <summary>Warmteoverdracht lucht ↔ oppervlak (W/(m²·K)); model, inclusief wind, uitstraling en verdamping.</summary>
+        public double Warmteoverdracht = 35;
         /// <summary>Menging door wind en stroming (m²/s); model.</summary>
-        public double Menging = 1e-6;
+        public double Menging = 4e-7;
+        /// <summary>Zonlicht op het oppervlak (W/m², daggemiddelde). 0 = geen zon.</summary>
+        public double Zon;
+        /// <summary>Weerkaatsing van zonlicht door ijs en door water (0 … 1); model.</summary>
+        public double AlbedoIjs = 0.5, AlbedoWater = 0.07;
+        /// <summary>Diepte (m) waarop het licht tot 1/e is uitgedoofd, in ijs en in water; model.</summary>
+        public double LichtdiepteIjs = 0.7, LichtdiepteWater = 0.8;
+        /// <summary>Dikte van de laag die de wind mengt als er geen ijs ligt (m); model.</summary>
+        public double Windlaag = 1.5;
+        /// <summary>Warmteoverdracht van water naar de onderkant van het ijs (W/(m²·K)); model.</summary>
+        public double OverdrachtOnderIjs = 10;
+
+        /// <summary>Smeltwater dat op het ijs staat (m water); alleen voor de weergave.</summary>
+        public double Smeltwater;
+        /// <summary>Opgeteld sinds de start (m ijs): aangegroeid aan de onderkant, gesmolten aan boven- en onderkant.</summary>
+        public double GegroeidOnder, GesmoltenBoven, GesmoltenOnder;
+        /// <summary>Wat het ijs de laatste stap deed: +1 groeit (onder), −1 smelt (boven), 0 niets.</summary>
+        public int IjsRichting;
 
         readonly double dz;
         static double C => Constanten.SoortelijkeWarmteWater * 1000 * 1000;   // J/(m³·K): 4,18 J/(g·K) · 10⁶ g/m³
@@ -55,32 +74,52 @@ namespace WaterSim.Sim
 
         void Deelstap(double dt, double tLucht)
         {
-            // --- oppervlak ---
             if (Ijsdikte > 0)
             {
-                // warmte door het ijs en de lucht (in serie); onder het ijs is het water 0 °C
-                double weerstand = Ijsdikte / Constanten.WarmtegeleidingIjs + 1.0 / Warmteoverdracht;
-                double qUit = (0 - tLucht) / weerstand;                     // W/m², > 0: warmte naar de lucht
-                Ijsdikte += qUit * dt / (RhoIjs * Lf);                      // uit = bevriezen, in = smelten
-                // het water onder het ijs geeft warmte af aan het ijs (smelt het van onderen)
-                double qWater = C * Menging * (T[0] - 0) / (dz / 2);
-                T[0] -= qWater * dt / (C * dz);
-                Ijsdikte -= qWater * dt / (RhoIjs * Lf);
-                if (Ijsdikte < 0)
+                // zonlicht: deel weerkaatst, deel blijft in het ijs (aan de bovenkant), deel gaat door het ijs het water in
+                double inIjs = Zon * (1 - AlbedoIjs);
+                double doorIjs = inIjs * Math.Exp(-Ijsdikte / LichtdiepteIjs);
+                double opIjs = inIjs - doorIjs;
+                double qBoven = Warmteoverdracht * (tLucht - 0) + opIjs;      // W/m² naar het ijsoppervlak
+                if (qBoven > 0)
                 {
-                    T[0] += -Ijsdikte * RhoIjs * Lf / (C * dz);             // te veel gesmolten: warmte terug naar het water
-                    Ijsdikte = 0;
+                    // dooi: de bovenkant is 0 °C en smelt; er komt smeltwater op het ijs
+                    double smelt = Math.Min(Ijsdikte, qBoven * dt / (RhoIjs * Lf));
+                    Ijsdikte -= smelt; GesmoltenBoven += smelt;
+                    Smeltwater += smelt * RhoIjs / 1000.0;
+                    IjsRichting = -1;
                 }
+                else
+                {
+                    // vorst: warmte stroomt van het water door het ijs naar de lucht; het ijs groeit aan de onderkant
+                    double tZonLucht = tLucht + opIjs / Warmteoverdracht;
+                    double weerstand = Ijsdikte / Constanten.WarmtegeleidingIjs + 1.0 / Warmteoverdracht;
+                    double groei = (0 - tZonLucht) / weerstand * dt / (RhoIjs * Lf);
+                    Ijsdikte += groei; GegroeidOnder += groei;
+                    Smeltwater = 0;                                            // bevriest weer (vereenvoudigd)
+                    IjsRichting = 1;
+                }
+                Absorbeer(doorIjs, dt);
+                // water dat warmer is dan 0 °C smelt het ijs van onderen
+                double qWater = OverdrachtOnderIjs * Math.Max(0, T[0]);
+                double onder = Math.Min(Ijsdikte, qWater * dt / (RhoIjs * Lf));
+                Ijsdikte -= onder; GesmoltenOnder += onder;
+                T[0] -= onder * RhoIjs * Lf / (C * dz);
+                if (Ijsdikte <= 1e-6) { Ijsdikte = 0; Smeltwater = 0; }
             }
             else
             {
+                Smeltwater = 0; IjsRichting = 0;
                 double q = Warmteoverdracht * (tLucht - T[0]);
                 T[0] += q * dt / (C * dz);
+                Absorbeer(Zon * (1 - AlbedoWater), dt);
                 if (T[0] < 0)
                 {
                     Ijsdikte += -T[0] * C * dz / (RhoIjs * Lf);             // onder 0 °C: ijs vormt zich
                     T[0] = 0;
+                    IjsRichting = 1;
                 }
+                else Windmenging();
             }
 
             // --- menging tussen de lagen (bodem laat niets door) ---
@@ -88,11 +127,35 @@ namespace WaterSim.Sim
             var oud = (double[])T.Clone();
             for (int i = 0; i < Lagen; i++)
             {
-                double boven = i > 0 ? oud[i - 1] : oud[i], onder = i < Lagen - 1 ? oud[i + 1] : oud[i];
-                T[i] = oud[i] + f * (boven - 2 * oud[i] + onder);
+                double boven = i > 0 ? oud[i - 1] : oud[i], onderT = i < Lagen - 1 ? oud[i + 1] : oud[i];
+                T[i] = oud[i] + f * (boven - 2 * oud[i] + onderT);
             }
 
             Stabiliseer();
+        }
+
+        // licht dat het water in gaat (W/m²) wordt per laag geabsorbeerd: steeds minder naar de diepte;
+        // het (kleine) restje dat de bodem bereikt, verdwijnt in de bodem
+        void Absorbeer(double q, double dt)
+        {
+            if (q <= 0) return;
+            double vorige = 1;
+            for (int i = 0; i < Lagen; i++)
+            {
+                double z = (i + 1) * dz;
+                double nog = Math.Exp(-z / LichtdiepteWater);
+                T[i] += (vorige - nog) * q * dt / (C * dz);
+                vorige = nog;
+            }
+        }
+
+        // zonder ijs mengt de wind de bovenste laag tot één temperatuur
+        void Windmenging()
+        {
+            int n = Math.Max(1, Math.Min(Lagen, (int)Math.Round(Windlaag / dz)));
+            double som = 0;
+            for (int i = 0; i < n; i++) som += T[i];
+            for (int i = 0; i < n; i++) T[i] = som / n;
         }
 
         /// <summary>
