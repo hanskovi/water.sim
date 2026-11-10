@@ -121,5 +121,42 @@ namespace WaterSim.Tests
                 Assert.That(Math.Abs(m.Z[i]), Is.LessThanOrEqualTo(m.Lz / 2 + 0.01f));
             }
         }
-    }
+    
+        [Test]
+        public void BijBevriezenReistGeenMolecuulVerEnZijnErGeenLangeBruggen()
+        {
+            var m = new Watermodel(5, 3, 3, 1, -5) { Parallel = false };
+            for (int s = 0; s < 400 && m.Fase.Gesmolten < 1; s++) m.Stap(0.05f, 30);    // smelten
+            for (int s = 0; s < 100; s++) m.Stap(0.05f, 30);                              // even als vloeistof bewegen
+            var px = (float[])m.X.Clone(); var py = (float[])m.Y.Clone(); var pz = (float[])m.Z.Clone();
+            float maxSprong = 0, maxBrug = 0;
+            for (int s = 0; s < 600 && m.Fase.Gesmolten > 0; s++)                          // bevriezen
+            {
+                m.Stap(0.05f, -30);
+                for (int i = 0; i < m.N; i++)
+                {
+                    // moleculen zijn niet te onderscheiden (bij bevriezen ruilen ze van nummer): kijk naar de dichtstbijzijnde
+                    // positie van de vorige stap, welk nummer die ook had
+                    float kort = float.MaxValue;
+                    for (int q = 0; q < m.N; q++)
+                    {
+                        float dx = Watermodel.Kortst(m.X[i] - px[q], m.Lx), dy = Watermodel.Kortst(m.Y[i] - py[q], m.Ly), dz = Watermodel.Kortst(m.Z[i] - pz[q], m.Lz);
+                        kort = System.Math.Min(kort, dx * dx + dy * dy + dz * dz);
+                    }
+                    maxSprong = System.Math.Max(maxSprong, (float)System.Math.Sqrt(kort));
+                    for (int k = 0; k < 2; k++)
+                    {
+                        int j = m.Acceptor[2 * i + k];
+                        if (j < 0) continue;
+                        float bx = Watermodel.Kortst(m.X[j] - m.X[i], m.Lx), by = Watermodel.Kortst(m.Y[j] - m.Y[i], m.Ly), bz = Watermodel.Kortst(m.Z[j] - m.Z[i], m.Lz);
+                        maxBrug = System.Math.Max(maxBrug, (float)System.Math.Sqrt(bx * bx + by * by + bz * bz));
+                    }
+                }
+                System.Array.Copy(m.X, px, m.N); System.Array.Copy(m.Y, py, m.N); System.Array.Copy(m.Z, pz, m.N);
+            }
+            Assert.That(m.Fase.Gesmolten, Is.EqualTo(0), "alles bevroren");
+            Assert.That(maxSprong, Is.LessThan(1.0f), "geen molecuul verspringt of racet (per stap van 0,05 s)");
+            Assert.That(maxBrug, Is.LessThan(m.BrugAfstand + 1.0f), "geen lange H-bruggen (O–O; de vloeistof beweegt na het zoeken nog een stapje)");
+        }
+}
 }

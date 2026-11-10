@@ -151,7 +151,15 @@ namespace WaterSim.Sim
                     lx[i] = X[i]; ly[i] = Y[i]; lz[i] = Z[i];
                     vx[i] = vy[i] = vz[i] = 0;
                 }
-                else if (!moet && Vloeibaar[i]) { Vloeibaar[i] = false; terug[i] = 0f; }
+                else if (!moet && Vloeibaar[i])
+                {
+                    // Bevriezen: roosterplek i wordt weer ijs. Moleculen zijn niet te onderscheiden, dus de plek wordt
+                    // ingenomen door het vloeibare molecuul dat er het dichtst bij is (zoals aan een echt ijsfront).
+                    // Daarvoor ruilen i en dat molecuul hun vloeistoftoestand: niemand verspringt, niemand reist ver.
+                    int m = DichtstbijzijndeVloeistof(i, rang, nVloeibaar);
+                    if (m >= 0 && m != i) RuilVloeistof(i, m);
+                    Vloeibaar[i] = false; terug[i] = 0f;
+                }
             }
             float rhoW = (float)Constanten.DichtheidWater(Math.Max(0, T));
             Bovenkant = Oneindig ? Ly / 2 : -Ly / 2 + Ly * (1f - (float)Fase.Gesmolten * (1f - (float)Constanten.DichtheidIjsBinas / rhoW));
@@ -199,7 +207,34 @@ namespace WaterSim.Sim
             int j = latAcc[2 * i + k];
             if (!Oneindig && latRand[2 * i + k]) return -1;   // over de rand bestaat in een los blok niet
             if (Vloeibaar[j]) return -1;
+            if (terug[j] < 0.95f) return -1;                  // de buur is nog niet op zijn plek: nog geen brug
             return j;
+        }
+
+        // het vloeibare molecuul dat het dichtst bij roosterplek i is (i zelf telt mee); −1 als er geen is
+        int DichtstbijzijndeVloeistof(int i, int[] rang, int nVloeibaar)
+        {
+            int beste = -1; float bd = float.MaxValue;
+            for (int m = 0; m < N; m++)
+            {
+                if (!Vloeibaar[m]) continue;
+                if (m != i && rang[m] >= nVloeibaar) continue;   // ook aan het bevriezen: die zoekt zelf een plek
+                float dx = lx[m] - ox[i], dy = ly[m] - oy[i], dz = lz[m] - oz[i];
+                if (Oneindig) { dx = Kortst(dx, Lx); dy = Kortst(dy, Ly); dz = Kortst(dz, Lz); }
+                float d = dx * dx + dy * dy + dz * dz;
+                if (d < bd) { bd = d; beste = m; }
+            }
+            return beste;
+        }
+
+        // ruil de vloeistoftoestand (plaats, snelheid, richting van de H-atomen) van twee moleculen
+        void RuilVloeistof(int a, int b)
+        {
+            (lx[a], lx[b]) = (lx[b], lx[a]); (ly[a], ly[b]) = (ly[b], ly[a]); (lz[a], lz[b]) = (lz[b], lz[a]);
+            (vx[a], vx[b]) = (vx[b], vx[a]); (vy[a], vy[b]) = (vy[b], vy[a]); (vz[a], vz[b]) = (vz[b], vz[a]);
+            for (int q = 0; q < 6; q++) (H[6 * a + q], H[6 * b + q]) = (H[6 * b + q], H[6 * a + q]);
+            (X[a], X[b]) = (X[b], X[a]); (Y[a], Y[b]) = (Y[b], Y[a]); (Z[a], Z[b]) = (Z[b], Z[a]);
+            (tel[a], tel[b]) = (tel[b], tel[a]);
         }
 
         // ---------- vloeistof ----------

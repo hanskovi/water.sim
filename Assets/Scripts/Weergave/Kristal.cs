@@ -88,6 +88,8 @@ namespace WaterSim.Weergave
         public float SimulatieMs { get; private set; }
 
         public enum BrugVorm { Stippen, Streepjes }
+        /// <summary>Langste H···O die als waterstofbrug getekend wordt (Å): de O–O-grens van het model min de O–H-binding, plus marge.</summary>
+        const float MaxBrugLengte = 2.9f;
         const int MaxBrugDelen = 16;
         const int PulsGroepen = 6;
         const float AfstandOH = (float)Constanten.AfstandOH;
@@ -329,7 +331,7 @@ namespace WaterSim.Weergave
         {
             var v = a - h;
             float L = v.magnitude;
-            if (L < 0.8f) return;
+            if (L < 0.8f || L > MaxBrugLengte) return;      // langer dan een echte H-brug (H···O): niet tekenen
             v /= L;
             int delen = Mathf.Clamp(brugDelen, 1, MaxBrugDelen);
             float s0 = 0.24f, s1 = L - 0.40f, stuk = (s1 - s0) / delen;
