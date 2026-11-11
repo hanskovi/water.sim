@@ -58,7 +58,9 @@ namespace WaterSim.UI
         const float HexR = 30f, HexLijn = 2.4f, HexMax = 0.6f;
         const int Pluimen = 5;
 
-        float tijd;
+        // Gewone klok van Unity: loopt door als het scherm opnieuw wordt opgebouwd (bv. bij een andere levelknop),
+        // zodat golf en pluimen niet steeds opnieuw beginnen.
+        static float tijd => Time.unscaledTime;
 
         protected override void Awake()
         {
@@ -70,7 +72,6 @@ namespace WaterSim.UI
         void Update()
         {
             if (laag == Laag.IJs) return;          // het rooster staat stil
-            tijd += Time.unscaledDeltaTime;
             SetVerticesDirty();
         }
 
