@@ -179,6 +179,74 @@ def vloeistof(d, db, punten, schaal):
                     h_brug(db, hp, o2, 13 * schaal, 22 * schaal, 4, 2)
 
 
+
+GRIJS = (70, 74, 84)
+
+
+def _draai(p, ax, ay):
+    x, y, z = p
+    c, s = math.cos(ay), math.sin(ay); x, z = c * x + s * z, -s * x + c * z
+    c, s = math.cos(ax), math.sin(ax); y, z = c * y - s * z, s * y + c * z
+    return (x, y, z)
+
+
+def _dempen(kleur, t):
+    """Achterste atomen donkerder (t = 0 achter, 1 voor), voor diepte."""
+    m = 0.3 + 0.7 * t ** 1.3
+    return tuple(int(c * m) for c in kleur)
+
+
+def gashydraat(tek, db, cx, cy, R=92, schaal=0.42):
+    """Kooi van gashydraat (dodecaëder, 5^12): 20 watermoleculen op de hoekpunten, H-bruggen langs de 30 ribben
+    (ijsregels: elke rib één H), met een methaanmolecuul in het midden. Model, niet op schaal."""
+    phi = (1 + 5 ** 0.5) / 2
+    v = [(a, b, c) for a in (-1, 1) for b in (-1, 1) for c in (-1, 1)]
+    for a in (-1, 1):
+        for b in (-1, 1):
+            v += [(0, a / phi, b * phi), (a / phi, b * phi, 0), (a * phi, 0, b / phi)]
+    ribben = [(i, j) for i in range(20) for j in range(i + 1, 20) if abs(math.dist(v[i], v[j]) - 2 / phi) < 1e-6]
+    v = [_draai(p, 0.35, 0.5) for p in v]
+    P = [(cx + x * R * 6 / (6 - z), cy + y * R * 6 / (6 - z), z, 6 / (6 - z)) for (x, y, z) in v]
+    zs = [p[2] for p in P]; z0, z1 = min(zs), max(zs)
+    t = [(z - z0) / (z1 - z0) for z in zs]
+    gegeven = [0] * 20; donor = {}
+    for (i, j) in sorted(ribben, key=lambda e: (e[0] * 7 + e[1] * 3) % 11):
+        dd = i if gegeven[i] <= gegeven[j] else j
+        donor[(i, j)] = dd; gegeven[dd] += 1
+    items = [((zs[i] + zs[j]) / 2, "rib", donor[(i, j)], j if donor[(i, j)] == i else i) for (i, j) in ribben]
+    items += [(zs[i] + 0.01, "O", i, None) for i in range(20)] + [(0.2, "CH4", None, None)]
+    items.sort(key=lambda x: x[0])
+    for z, soort, i, j in items:
+        d = ImageDraw.Draw(tek)
+        if soort == "rib":
+            o, a = P[i], P[j]; tt = (t[i] + t[j]) / 2; s = schaal * (o[3] + a[3]) / 2
+            ux, uy = a[0] - o[0], a[1] - o[1]; L = math.hypot(ux, uy); ux, uy = ux / L, uy / L
+            h = (o[0] + ux * 46 * s, o[1] + uy * 46 * s)
+            d.line([o[0], o[1], h[0], h[1]], fill=_dempen(WIT, tt) + (235,), width=max(2, int(8 * s)))
+            atoom(d, h[0], h[1], 13 * s, _dempen(WIT, tt))
+            if L > 81 * s + 8:
+                h_brug(db, h, (a[0], a[1]), 13 * s, 22 * s, max(3, int(6 * s)), 3)
+        elif soort == "O":
+            p = P[i]; s = schaal * p[3]
+            if gegeven[i] < 2:                         # tweede H wijst naar buiten de kooi
+                ux, uy = p[0] - cx, p[1] - cy; L = math.hypot(ux, uy) or 1
+                h = (p[0] + ux / L * 46 * s, p[1] + uy / L * 46 * s)
+                d.line([p[0], p[1], h[0], h[1]], fill=_dempen(WIT, t[i]) + (235,), width=max(2, int(8 * s)))
+                atoom(d, h[0], h[1], 13 * s, _dempen(WIT, t[i]))
+            atoom(d, p[0], p[1], 22 * s, _dempen(ROOD, t[i]))
+        else:                                           # methaan (tetraëder) in het midden
+            hs = sorted((_draai(q, 0.6, 0.4) for q in [(1, 1, 1), (1, -1, -1), (-1, 1, -1), (-1, -1, 1)]), key=lambda q: q[2])
+            for q in [q for q in hs if q[2] <= 0]:
+                hx, hy = cx + q[0] * 30, cy + q[1] * 30
+                d.line([cx, cy, hx, hy], fill=WIT + (235,), width=6); atoom(d, hx, hy, 11, (200, 205, 215))
+            atoom(d, cx, cy, 20, GRIJS)
+            d.ellipse([cx - 20, cy - 20, cx + 20, cy + 20], outline=(150, 155, 170, 255), width=2)
+            for q in [q for q in hs if q[2] > 0]:
+                hx, hy = cx + q[0] * 30, cy + q[1] * 30
+                d.line([cx, cy, hx, hy], fill=WIT + (235,), width=6); atoom(d, hx, hy, 11, WIT)
+    return tek
+
+
 def tegel(n):
     f_groot = ImageFont.truetype(FONT, 26)
     f_klein = ImageFont.truetype(FONT, 18)
@@ -231,19 +299,9 @@ def tegel(n):
         ijsring(d, db, cx, by + z * 0.41, 38, 0.36, [60 * k + 30 for k in range(6)])
         vloeistof(d, db, [(cx - 140, wl + 40, 20), (cx + 140, wl + 45, 200), (cx - 125, wl + 95, 300), (cx + 125, wl + 100, 110),
                           (cx - 60, wl + 140, 60), (cx + 20, wl + 150, 250), (cx + 90, wl + 145, 330)], 0.45)
-    elif n == 6:    # koken: dicht water onderin met belletjes; hele moleculen komen los en stijgen op
-        opp = cy + 25
-        d.line([cx - 175, opp, cx + 175, opp], fill=CYAAN + (220,), width=4)
-        for (x, y, r) in [(cx - 40, cy + 95, 24), (cx + 95, cy + 120, 17)]:
-            d.ellipse([x - r, y - r, x + r, y + r], outline=CYAAN + (255,), width=4)
-        for (x, y, h) in [(cx - 140, cy + 60, 20), (cx - 95, cy + 105, 250), (cx + 20, cy + 60, 130),
-                          (cx + 60, cy + 115, 330), (cx + 140, cy + 70, 200), (cx - 150, cy + 130, 90), (cx + 165, cy + 130, 60)]:
-            molecuul(d, x, y, 0.6, h, labels=False)
-        for (x, y, h) in [(cx - 90, cy - 60, 300), (cx + 60, cy - 105, 210), (cx + 140, cy - 30, 30)]:
-            molecuul(d, x, y, 0.62, h, labels=False)
-            for k in range(1, 4):                               # spoortje: hij komt uit het water
-                rr = 5 - k
-                d.ellipse([x - rr, y + 26 + k * 16 - rr, x + rr, y + 26 + k * 16 + rr], fill=CYAAN + (220 - 55 * k,))
+    elif n == 6:    # Ontdek: gashydraat, een kooi van watermoleculen (H-bruggen) met een methaanmolecuul erin
+        tek = gashydraat(tek, db, cx, cy)
+        d = ImageDraw.Draw(tek)
 
     tek, bruggen = binnen_cirkel([tek, bruggen], cx, cy, BINNEN_R)
     bruggen = gloed(bruggen, 6)
@@ -254,6 +312,7 @@ def tegel(n):
 
 
 if __name__ == "__main__":
-    for n in range(1, 7):
+    import sys
+    for n in ([int(a) for a in sys.argv[1:]] or range(1, 7)):     # bv. "python3 maak_tegels.py 6" voor alleen tegel 6
         tegel(n)
     print("klaar:", UIT)
