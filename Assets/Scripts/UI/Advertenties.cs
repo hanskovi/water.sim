@@ -18,6 +18,8 @@ namespace WaterSim.UI
     /// - In test- en releasebuilds (Android/iOS): ECHTE advertenties via Google AdMob, na het toestemmingsvenster (UMP)
     ///   waar dat nodig is (EER, VK, Zwitserland). Registreer je eigen toestellen in AdMob als testtoestel, anders kan
     ///   een eigen tik als ongeldig verkeer tellen.
+    /// - De app is voor scholieren vanaf 14 jaar: alle gebruikers krijgen de tienerbehandeling (geen persoonlijke
+    ///   advertenties, inhoud hooguit rating T).
     /// - Een interstitial komt hooguit eens per <see cref="MinTussenInterstitials"/> seconden, en alleen tussen rondes.
     ///
     /// Gebaseerd op de AdManager van C.chem (toestemming eerst, callbacks op de Unity-thread).
@@ -159,6 +161,8 @@ namespace WaterSim.UI
 #if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR && !DEVELOPMENT_BUILD
         // ---------- echte advertenties (AdMob) ----------
         const float ToestemmingTimeout = 8f;
+        /// <summary>Gebruikers gelden als jonger dan de leeftijd van toestemming (16 in NL): alleen niet-persoonlijke advertenties.</summary>
+        const bool OnderLeeftijdVanToestemming = true;
         bool gestart;
         BannerView banner;
         InterstitialAd interstitial;
@@ -170,7 +174,7 @@ namespace WaterSim.UI
             Invoke(nameof(TimeoutToestemming), ToestemmingTimeout);
             try
             {
-                ConsentInformation.Update(new ConsentRequestParameters(), fout => OpHoofdThread(() =>
+                ConsentInformation.Update(new ConsentRequestParameters { TagForUnderAgeOfConsent = OnderLeeftijdVanToestemming }, fout => OpHoofdThread(() =>
                 {
                     if (fout != null) { Debug.LogWarning("[Advertenties] toestemming bijwerken mislukt: " + fout.Message); StartAdvertenties(true); return; }
                     ConsentForm.LoadAndShowConsentFormIfRequired(formFout => OpHoofdThread(() =>
@@ -192,8 +196,13 @@ namespace WaterSim.UI
             if (!zonderControle && !ConsentInformation.CanRequestAds()) return;     // eerst het toestemmingsvenster
             gestart = true;
             CancelInvoke(nameof(TimeoutToestemming));
-            // de app is voor scholieren vanaf 14 jaar: alleen advertenties die geschikt zijn voor tieners
-            MobileAds.SetRequestConfiguration(new RequestConfiguration { MaxAdContentRating = MaxAdContentRating.T });
+            // de app is voor scholieren vanaf 14 jaar (in NL is de leeftijd van toestemming 16): tienerbehandeling, dus
+            // geen persoonlijke advertenties, en alleen advertenties die geschikt zijn voor tieners
+            MobileAds.SetRequestConfiguration(new RequestConfiguration
+            {
+                AgeRestrictedTreatment = AgeRestrictedTreatment.Teen,
+                MaxAdContentRating = MaxAdContentRating.T,
+            });
             MobileAds.Initialize(_ => { ToonBanner(); LaadInterstitial(); });
         }
 
