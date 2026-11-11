@@ -31,6 +31,8 @@ namespace WaterSim.UI
 
         /// <summary>Hoogte van de banner in pixels zodra die bekend is (voor de vrije strook onderaan).</summary>
         public static event Action<float> BannerHoogteBekend;
+        /// <summary>Hoogte van de geladen banner in pixels, of −1 zolang er geen is (voor wie zich pas later aanmeldt).</summary>
+        public static float BannerPixels { get; private set; } = -1f;
         /// <summary>Wordt aangeroepen als bekend is of de knop "Privacykeuzes" nodig is.</summary>
         public static event Action PrivacyKeuzesGewijzigd;
 
@@ -239,7 +241,11 @@ namespace WaterSim.UI
             banner?.Destroy();
             var maat = AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
             banner = new BannerView(BannerId, maat, AdPosition.Bottom);
-            banner.OnBannerAdLoaded += () => BannerHoogteBekend?.Invoke(banner.GetHeightInPixels());
+            banner.OnBannerAdLoaded += () => OpHoofdThread(() =>
+            {
+                BannerPixels = banner.GetHeightInPixels();
+                BannerHoogteBekend?.Invoke(BannerPixels);
+            });
             banner.LoadAd(new AdRequest());
         }
 

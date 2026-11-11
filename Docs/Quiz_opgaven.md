@@ -26,7 +26,7 @@ Levels 1, 2 en 6 zijn nog leeg. Hier neem ik molecuul, H-brug en koken aan, zoal
 4. MK · Wat is H₂O in gewone woorden? **water** / waterstof / zuurstof / zout
 5. MK · Wat gebeurt er met de moleculen zelf als ijs smelt? **niets, ze blijven H₂O** / ze worden groter / ze splitsen in H en O / ze verdwijnen
 6. GT · Uit hoeveel atomen bestaat één watermolecuul? **3**
-7. MK · Wat zit er tussen de moleculen in? **niets (lege ruimte)** / lucht / water / stof
+7. MK · Wat zit er tussen de watermoleculen in? **niets (lege ruimte)** / lucht / water / stof
 8. MK · Zijn moleculen met het blote oog te zien? **nee, veel te klein** / ja, als stipjes / alleen onder een vergrootglas / alleen in ijs
 9. MK · Bewegen de moleculen in een glas water stil? **nee, ze bewegen altijd** / ja / alleen als je roert / alleen als het kookt
 10. MK · Wat stelt het model niet goed op schaal voor? **de grootte en de snelheid van de moleculen** / het aantal atomen in een molecuul / de kleur van water / niets
@@ -62,7 +62,7 @@ Levels 1, 2 en 6 zijn nog leeg. Hier neem ik molecuul, H-brug en koken aan, zoal
 ### Onderbouw
 1. MK · Wat houdt watermoleculen bij elkaar? **een aantrekkende kracht tussen moleculen** / lijm / ijzerdraadjes / niets
 2. MK · Een waterstofbrug zit… **tussen twee moleculen** / binnen één molecuul / tussen twee H-atomen van hetzelfde molecuul / in de kern
-3. MK · Wat is sterker? **de binding binnen het molecuul** / de waterstofbrug / even sterk / hangt van de kleur af
+3. MK · Wat is sterker: de binding tussen O en H binnen een watermolecuul, of de waterstofbrug tussen twee watermoleculen? **de binding binnen het molecuul** / de waterstofbrug / even sterk / hangt van de kleur af
 4. MK · Waarom kookt water pas bij 100 °C, terwijl het molecuul zo licht is? **de moleculen houden elkaar stevig vast** / water is zwaar / door de lucht / door het zout
 5. MK · Waarom kan een schaatsenrijder (het waterinsect) op water lopen? **oppervlaktespanning door de aantrekking tussen moleculen** / water is hard / het insect is gewichtloos / de lucht duwt
 6. MK · Waarom vormt water ronde druppels? **de moleculen trekken elkaar naar binnen** / door de zwaartekracht / door de wind / water is plakkerig
@@ -76,7 +76,7 @@ Levels 1, 2 en 6 zijn nog leeg. Hier neem ik molecuul, H-brug en koken aan, zoal
 2. GT · Maximaal aantal H-bruggen per watermolecuul? **4** (2 als donor, 2 als acceptor)
 3. MK · H₂S (zelfde vorm, zwaarder) kookt bij… **−60 °C** / 100 °C / 200 °C / 0 °C
 4. MK · Verklaring voor 3? **H₂S vormt nauwelijks H-bruggen** / H₂S is lichter / H₂S is een ion / zwavel is kleiner
-5. GT · Hoeveel keer zwakker is een H-brug (≈ 20 kJ/mol) dan een O–H-binding (463 kJ/mol)? **≈ 20–25×** (antwoord 23, ±3)
+5. GT · Om 1 mol waterstofbruggen te verbreken is ongeveer 20 kJ nodig, voor 1 mol O–H-bindingen 463 kJ (de bindingsenergieën). Hoeveel keer zwakker is de waterstofbrug? **≈ 20–25×** (antwoord 23, ±3)
 6. GT · Afstand H···O in een H-brug in Å, als O–O = 2,76 en O–H = 0,96? **1,80** (±0,02)
 7. MK · Welke stof mengt goed met water door H-bruggen? **ethanol** / hexaan / olie / tetra
 8. MK · Waarom heeft water een grote soortelijke warmte (4,18 J/(g·K))? **een deel van de warmte gaat naar het verbreken van H-bruggen** / water is zwaar / water geleidt goed / door opgeloste lucht

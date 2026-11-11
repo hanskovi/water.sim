@@ -137,6 +137,7 @@ namespace WaterSim.UI
             Bouw();
             Teksten.Gewijzigd += Bouw;
             Advertenties.BannerHoogteBekend += ZetBannerHoogte;          // echte banner: precies zoveel ruimte vrijhouden
+            if (Advertenties.BannerPixels >= 0f) ZetBannerHoogte(Advertenties.BannerPixels);   // al geladen vóór deze pagina
             Advertenties.PrivacyKeuzesGewijzigd += Bouw;
             Vliegcamera.OpUI = OpUI;
             ToonPagina(Pagina.Start);
