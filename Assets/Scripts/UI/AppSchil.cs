@@ -136,6 +136,8 @@ namespace WaterSim.UI
 
             Bouw();
             Teksten.Gewijzigd += Bouw;
+            Advertenties.BannerHoogteBekend += ZetBannerHoogte;          // echte banner: precies zoveel ruimte vrijhouden
+            Advertenties.PrivacyKeuzesGewijzigd += Bouw;
             Vliegcamera.OpUI = OpUI;
             ToonPagina(Pagina.Start);
         }
@@ -143,6 +145,8 @@ namespace WaterSim.UI
         void OnDestroy()
         {
             Teksten.Gewijzigd -= Bouw;
+            Advertenties.BannerHoogteBekend -= ZetBannerHoogte;
+            Advertenties.PrivacyKeuzesGewijzigd -= Bouw;
             if (Vliegcamera.OpUI == (Predicate<Vector2>)OpUI) Vliegcamera.OpUI = null;
         }
 
@@ -1454,6 +1458,12 @@ namespace WaterSim.UI
             Actief(over.img, over.t, overOpen);
             if (overOpen)
                 Tekst(kaart.transform, "Over", string.Format(Teksten.T("menu.over.tekst"), Application.version), 12f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            // privacykeuzes voor advertenties (verplicht te kunnen wijzigen in de EER)
+            if (Advertenties.PrivacyKeuzesNodig)
+            {
+                var pk = Pilknop(kaart.transform, Teksten.T("menu.privacy"), Advertenties.ToonPrivacyKeuzes);
+                LE(pk.img.gameObject, prefH: 34f);
+            }
             // voortgang wissen (met bevestiging)
             if (!wissenVragen)
             {

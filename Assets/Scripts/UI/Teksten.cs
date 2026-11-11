@@ -138,6 +138,7 @@ namespace WaterSim.UI
             ["menu.over"] = ("Over Water.sim", "About Water.sim"),
             ["menu.over.tekst"] = ("Versie {0}. Water op molecuulniveau, voor scheikunde en natuurkunde.\n\nBronnen: Binas; klimaatnormalen 1991–2020 van KNMI, KMA, JMA, ECCC, NOAA, FMI, BoM, NIWA en NEA; zeespiegel: Morlighem e.a. (2017), Fretwell e.a. (2013); dichtheid van water: Thiesen.", "Version {0}. Water at the molecular level, for chemistry and physics.\n\nSources: Binas; 1991–2020 climate normals from KNMI, KMA, JMA, ECCC, NOAA, FMI, BoM, NIWA and NEA; sea level: Morlighem et al. (2017), Fretwell et al. (2013); density of water: Thiesen."),
             ["menu.wissen"] = ("Voortgang wissen", "Clear progress"),
+            ["menu.privacy"] = ("Privacykeuzes (advertenties)", "Privacy choices (ads)"),
             ["menu.wissen.vraag"] = ("Alle voortgang en instellingen wissen (behalve de taal)? Dit kan niet ongedaan worden.", "Clear all progress and settings (except the language)? This cannot be undone."),
             ["menu.ja"] = ("Wissen", "Clear"),
             ["menu.nee"] = ("Annuleren", "Cancel"),
