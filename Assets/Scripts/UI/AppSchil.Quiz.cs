@@ -296,15 +296,20 @@ namespace WaterSim.UI
             }
             else
             {
+                // dichte achtergrond, zodat de 3D-scène er niet doorheen schijnt
+                var achter = Lin(Hex("0A3446"));
+                var vlak = Vlak(ouder, "Tekenvlak", achter, 10f);
+                LE(vlak.gameObject, flexH: 1f, minH: 220f);
                 var go = new GameObject("Tekenveld", typeof(RectTransform));
-                go.transform.SetParent(ouder, false);
+                go.transform.SetParent(vlak.transform, false);
+                Vul((RectTransform)go.transform, 0, 0, 0, 0);
+                go.AddComponent<CanvasRenderer>();                   // eerst zelf toevoegen, anders tekent het veld niets
                 var veld = go.AddComponent<Tekenveld>();
                 veld.color = Color.white;
                 veld.Font = Vet;
-                var achter = Lin(Hex("05293A")); achter.a = 1f; veld.Achter = achter;
+                veld.Achter = achter;
                 veld.Moleculen = tekenMoleculen; veld.Bruggen = tekenBruggen; veld.Oordelen = tekenOordelen;
                 veld.Vergrendeld = gecontroleerd;
-                LE(go, flexH: 1f, minH: 220f);
                 veld.Ververs();
 
                 var model = Tekst(ouder, "Model", Teksten.T("quiz.teken.model"), 10.5f, new Color(1f, 1f, 1f, 0.55f), TextAlignmentOptions.Center);
