@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-#if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR && !DEVELOPMENT_BUILD
+#if UNITY_ANDROID || UNITY_IOS
 using GoogleMobileAds.Api;
 using GoogleMobileAds.Ump.Api;
 #endif
@@ -13,11 +13,12 @@ namespace WaterSim.UI
     /// <summary>
     /// Advertenties: een banner onderaan elke pagina en een interstitial na een afgeronde quizronde.
     ///
-    /// - In de editor en in development builds: NEP-advertenties. De banner is de grijze strook die AppSchil al toont,
-    ///   de interstitial een eigen scherm "advertentie (nep)". Er wordt niets bij Google opgevraagd.
+    /// - In de editor (doel Android of iOS): de nep-advertenties van de AdMob-SDK zelf (banner en interstitial).
+    /// - In development builds: Google's TEST-advertenties ("Test Ad"); eigen tikken tellen niet mee.
     /// - In test- en releasebuilds (Android/iOS): ECHTE advertenties via Google AdMob, na het toestemmingsvenster (UMP)
     ///   waar dat nodig is (EER, VK, Zwitserland). Registreer je eigen toestellen in AdMob als testtoestel, anders kan
     ///   een eigen tik als ongeldig verkeer tellen.
+    /// - Zonder SDK (ander platform): de grijze strook van AppSchil en een eigen scherm "advertentie (nep)".
     /// - De app is voor scholieren vanaf 14 jaar: alle gebruikers krijgen de tienerbehandeling (geen persoonlijke
     ///   advertenties, inhoud hooguit rating T).
     /// - Een interstitial komt hooguit eens per <see cref="MinTussenInterstitials"/> seconden, en alleen tussen rondes.
@@ -37,10 +38,17 @@ namespace WaterSim.UI
         public const float MinTussenInterstitials = 60f;
         float laatsteInterstitial = -1000f;
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        public static bool Nep => true;
-#else
+#if UNITY_ANDROID || UNITY_IOS
+        /// <summary>Eigen nep-advertenties (alleen als de AdMob-SDK er niet is, bv. de editor met Standalone als doel).</summary>
         public static bool Nep => false;
+#else
+        public static bool Nep => true;
+#endif
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>Editor en development builds: Google's test-ID's (in de editor nep-advertenties van de SDK, op een toestel "Test Ad").</summary>
+        static readonly bool TestIds = true;
+#else
+        static readonly bool TestIds = false;
 #endif
 
         // Ad-unit-ID's van Water.sim (AdMob). Laat je er een leeg, dan gebruikt de app daar Google's test-ID.
@@ -53,8 +61,8 @@ namespace WaterSim.UI
 #else
         const string EchteBanner = "", EchteInterstitial = "", TestBanner = "", TestInterstitial = "";
 #endif
-        static string BannerId => EchteBanner != "" ? EchteBanner : TestBanner;
-        static string InterstitialId => EchteInterstitial != "" ? EchteInterstitial : TestInterstitial;
+        static string BannerId => TestIds || EchteBanner == "" ? TestBanner : EchteBanner;
+        static string InterstitialId => TestIds || EchteInterstitial == "" ? TestInterstitial : EchteInterstitial;
 
         readonly Queue<Action> hoofdThread = new Queue<Action>();
         void OpHoofdThread(Action a) { lock (hoofdThread) hoofdThread.Enqueue(a); }
@@ -71,7 +79,7 @@ namespace WaterSim.UI
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
             Instance = this;
             DontDestroyOnLoad(gameObject);
-#if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR && !DEVELOPMENT_BUILD
+#if UNITY_ANDROID || UNITY_IOS
             MobileAds.RaiseAdEventsOnUnityMainThread = true;
             VraagToestemmingDanStart();
 #endif
@@ -93,7 +101,7 @@ namespace WaterSim.UI
             if (Time.realtimeSinceStartup - laatsteInterstitial < MinTussenInterstitials) { daarna?.Invoke(); return; }
             laatsteInterstitial = Time.realtimeSinceStartup;
             if (Nep) { NepInterstitial(daarna); return; }
-#if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR && !DEVELOPMENT_BUILD
+#if UNITY_ANDROID || UNITY_IOS
             if (gestart && interstitial != null && interstitial.CanShowAd())
             {
                 naInterstitial = daarna;
@@ -134,7 +142,7 @@ namespace WaterSim.UI
         {
             get
             {
-#if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR && !DEVELOPMENT_BUILD
+#if UNITY_ANDROID || UNITY_IOS
                 try { return ConsentInformation.PrivacyOptionsRequirementStatus == PrivacyOptionsRequirementStatus.Required; }
                 catch (Exception) { return false; }
 #else
@@ -146,7 +154,7 @@ namespace WaterSim.UI
         /// <summary>Toont Google's venster met privacykeuzes voor advertenties.</summary>
         public static void ToonPrivacyKeuzes()
         {
-#if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR && !DEVELOPMENT_BUILD
+#if UNITY_ANDROID || UNITY_IOS
             ConsentForm.ShowPrivacyOptionsForm(fout =>
             {
                 var ik = Instance;
@@ -158,7 +166,7 @@ namespace WaterSim.UI
 #endif
         }
 
-#if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR && !DEVELOPMENT_BUILD
+#if UNITY_ANDROID || UNITY_IOS
         // ---------- echte advertenties (AdMob) ----------
         const float ToestemmingTimeout = 8f;
         /// <summary>Gebruikers gelden als jonger dan de leeftijd van toestemming (16 in NL): alleen niet-persoonlijke advertenties.</summary>

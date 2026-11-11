@@ -202,9 +202,9 @@ namespace WaterSim.UI
             verloopOnder.rectTransform.localScale = new Vector3(1f, -1f, 1f);       // gespiegeld: donker onderaan
 
             veilig = Maak("VeiligeZone", go.transform);
-            if (Debug.isDebugBuild)
+            if (Debug.isDebugBuild && bannerPixels < 0f)
             {
-                // alleen in de editor en testbuilds: laat zien waar de banner komt
+                // alleen in de editor en testbuilds, zolang er nog geen banner geladen is: laat zien waar de banner komt
                 bannerPlek = Vlak(veilig, "Bannerplek", new Color(0f, 0f, 0f, 0.55f));
                 bannerPlek.raycastTarget = false;
                 var bt = Tekst(bannerPlek.transform, "Tekst", "advertentie (banner)", 11f, new Color(1f, 1f, 1f, 0.6f), TextAlignmentOptions.Center);
@@ -251,7 +251,11 @@ namespace WaterSim.UI
         // advertentie-SDK erin zit, zet die met ZetBannerHoogte de echte hoogte (in pixels).
         float bannerPixels = -1f;
         Image bannerPlek;
-        public void ZetBannerHoogte(float pixels) { bannerPixels = pixels; kolomBreedte = -1f; }
+        public void ZetBannerHoogte(float pixels)
+        {
+            bannerPixels = pixels; kolomBreedte = -1f;
+            if (bannerPlek != null) { Destroy(bannerPlek.gameObject); bannerPlek = null; }    // de echte (of test-)banner staat er nu
+        }
         float BannerHoogte()
         {
             float schaal = CanvasSchaal();
