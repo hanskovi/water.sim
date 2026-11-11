@@ -70,7 +70,10 @@ namespace WaterSim.Besturing
         public void Zet(Vector3 positie, Vector3 kijkNaar)
         {
             transform.position = positie;
-            var r = Quaternion.LookRotation(kijkNaar - positie, Vector3.up).eulerAngles;
+            var richting = kijkNaar - positie;
+            if (richting.sqrMagnitude < 1e-8f) richting = transform.forward;          // camera staat al op het punt: blijf dezelfde kant op kijken
+            if (Mathf.Abs(Vector3.Dot(richting.normalized, Vector3.up)) > 0.9999f) richting += transform.right * 0.01f;   // recht omhoog/omlaag kan niet
+            var r = Quaternion.LookRotation(richting, Vector3.up).eulerAngles;
             yaw = r.y;
             pitch = r.x > 180f ? r.x - 360f : r.x;
             transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
