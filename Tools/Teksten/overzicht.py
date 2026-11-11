@@ -204,12 +204,13 @@ def antwoord_tekst(v, taal):
     if taal == "en": w = w.replace(",", ".")
     else: w = w.replace(".", ",") if not v.get("weergave") else w
     extra = []
-    if v.get("eenheid"): extra.append(html.escape(v["eenheid"]))
-    m = f' <span class="rest">(marge ±{html.escape(v["marge"])}'
+    if v.get("eenheid") and "10" not in v.get("weergave", ""): extra.append(v["eenheid"])      # zoals in de app: geen dubbele × 10²³
+    marge = v["marge"].replace(".", ",") if taal == "nl" else v["marge"]
+    m = f' <span class="rest">(marge ±{html.escape(marge)}'
     if v.get("macht") and v["macht"] != "0": m += f", ×10^{html.escape(v['macht'])}"
     if v.get("mindec") and v["mindec"] != "0": m += f", min. {html.escape(v['mindec'])} decimaal"
     m += ")</span>"
-    return f'<span class="goed">✓ {opgemaakt(w)} {" ".join(extra)}</span>{m}'
+    return f'<span class="goed">✓ {opgemaakt(w)} {opgemaakt(" ".join(extra))}</span>{m}'
 
 
 def maak():

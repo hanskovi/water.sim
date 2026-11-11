@@ -28,7 +28,7 @@ namespace WaterSim.Sim
         public double Tijd;
 
         /// <summary>Warmteoverdracht lucht ↔ oppervlak (W/(m²·K)); model, inclusief wind, uitstraling en verdamping.</summary>
-        public double Warmteoverdracht = 35;
+        public double Warmteoverdracht = Constanten.WarmteoverdrachtMeer;
         /// <summary>Menging door wind en stroming (m²/s); model.</summary>
         public double Menging = 4e-7;
         /// <summary>Zonlicht op het oppervlak (W/m², daggemiddelde). 0 = geen zon.</summary>

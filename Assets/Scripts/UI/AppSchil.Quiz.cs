@@ -137,6 +137,7 @@ namespace WaterSim.UI
                     NieuweRonde(); Bouw();
                 });
                 p.t.fontSize = 12.5f;
+                p.t.enableAutoSizing = true; p.t.fontSizeMin = 9f; p.t.fontSizeMax = 12.5f;
                 Actief(p.img, p.t, quizNiveau == i);
             }
 

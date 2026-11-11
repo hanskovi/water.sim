@@ -471,6 +471,7 @@ namespace WaterSim.UI
                 var pil = Vlak(strook.transform, "League" + i, new Color(1f, 1f, 1f, 0.14f), 7f);
                 if (i == league) Oranje(pil, 7f);
                 var t = Tekst(pil.transform, "Tekst", Teksten.T("league." + i), 13.5f, Color.white, TextAlignmentOptions.Center, i == league);
+                t.enableAutoSizing = true; t.fontSizeMin = 9f; t.fontSizeMax = 13.5f;      // "Middle school" past dan ook
                 Vul(t.rectTransform, 4, 0, 4, 0);
                 Knop(pil, () => { league = l; PlayerPrefs.SetInt("watersim.league", l); Bouw(); });
             }
@@ -796,6 +797,7 @@ namespace WaterSim.UI
                 G(WaterSim.Sim.Constanten.MolaireMassaWater, "0.0"),                                            // {12} M
                 G(WaterSim.Sim.Constanten.TemperatuurMaxDichtheid, "0"),                                        // {13} °C
                 G(WaterSim.Sim.Constanten.IjsA, "0.00"), G(WaterSim.Sim.Constanten.IjsC, "0.00"),               // {14} a, {15} c (Å)
+                G(WaterSim.Sim.Constanten.WarmteoverdrachtMeer, "0"),                                           // {16} h (W/(m²·K))
             };
         }
 
@@ -832,6 +834,7 @@ namespace WaterSim.UI
                 int n = i;
                 var p = Pilknop(tabs.transform, Teksten.T(i < 3 ? "league." + i : "info.model"), () => { infoNiveau = n; PlayerPrefs.SetInt("watersim.infoniveau", n); VulInfo(); }, i < 3 ? 1f : 0.7f);
                 p.t.fontSize = 12.5f;
+                p.t.enableAutoSizing = true; p.t.fontSizeMin = 9f; p.t.fontSizeMax = 12.5f;
                 infoTabs.Add((p.img, p.t, n));
             }
 

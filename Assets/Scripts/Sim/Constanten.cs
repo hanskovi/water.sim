@@ -30,6 +30,7 @@ namespace WaterSim.Sim
 
         // --- Warmtegeleiding (Binas) ---
         public const double WarmtegeleidingIjs = 2.2;       // W/(m·K), bij 0 °C
+        public const double WarmteoverdrachtMeer = 35;      // W/(m²·K), lucht ↔ oppervlak van het meer; model (wind, uitstraling, verdamping)
 
         // --- Warmte (Binas-waarden, afgerond) ---
         public const double Smeltwarmte = 334;              // J/g bij 0 °C

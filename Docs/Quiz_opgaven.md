@@ -46,7 +46,7 @@ Levels 1, 2 en 6 zijn nog leeg. Hier neem ik molecuul, H-brug en koken aan, zoal
 ### XPRT League
 1. MK · Waarom is de hoek 104,5° en niet 109,5° (tetraëder)? **vrije elektronenparen stoten sterker af dan bindende paren** / H-atomen trekken elkaar aan / door de waterstofbruggen / door warmtebeweging
 2. GT · Hoeveel trillingswijzen (normaalmodi) heeft een H₂O-molecuul? (3N − 6) **3**
-3. MK · Welke trillingswijzen zijn dat? **symmetrische strek, asymmetrische strek, buiging** / drie rotaties / drie translaties / twee strek, één torsie
+3. MK · Een H₂O-molecuul heeft 3 trillingswijzen (normaalmodi). Welke zijn dat? **symmetrische strek, asymmetrische strek, buiging** / drie rotaties / drie translaties / twee strek, één torsie
 4. GT · Dipoolmoment van water in debye? **1,85** (±0,05)
 5. MK · Zwaar water (D₂O) smelt bij… **3,8 °C** / 0 °C / −3,8 °C / 100 °C
 6. MK · Waarom heeft D₂O een hogere dichtheid dan H₂O (1,11 vs 1,00 g/cm³)? **zwaardere kernen, vrijwel even groot molecuul** / grotere moleculen / sterkere covalente binding / D₂O is geen water
@@ -64,7 +64,7 @@ Levels 1, 2 en 6 zijn nog leeg. Hier neem ik molecuul, H-brug en koken aan, zoal
 2. MK · Een waterstofbrug zit… **tussen twee moleculen** / binnen één molecuul / tussen twee H-atomen van hetzelfde molecuul / in de kern
 3. MK · Wat is sterker? **de binding binnen het molecuul** / de waterstofbrug / even sterk / hangt van de kleur af
 4. MK · Waarom kookt water pas bij 100 °C, terwijl het molecuul zo licht is? **de moleculen houden elkaar stevig vast** / water is zwaar / door de lucht / door het zout
-5. MK · Waarom kan een schaatsenrijder (het insect) op water lopen? **oppervlaktespanning door de aantrekking tussen moleculen** / water is hard / het insect is gewichtloos / de lucht duwt
+5. MK · Waarom kan een schaatsenrijder (het waterinsect) op water lopen? **oppervlaktespanning door de aantrekking tussen moleculen** / water is hard / het insect is gewichtloos / de lucht duwt
 6. MK · Waarom vormt water ronde druppels? **de moleculen trekken elkaar naar binnen** / door de zwaartekracht / door de wind / water is plakkerig
 7. MK · Wat gebeurt er met de bruggen als water warmer wordt? **er breken er meer** / ze worden sterker / er komen er meer bij / niets
 8. GT · Met hoeveel buren is een molecuul in ijs verbonden? **4**
@@ -87,7 +87,7 @@ Levels 1, 2 en 6 zijn nog leeg. Hier neem ik molecuul, H-brug en koken aan, zoal
 1. GT · Schat de energie van één H-brug uit de smeltwarmte. Bij smelten breekt ≈ 12,5% van de bruggen (van 2 naar 1,75 per molecuul), dus 0,25 mol bruggen per mol water. Antwoord in kJ/mol. **24** (±2)
 2. GT · Doe hetzelfde met de verdampingswarmte: bij verdampen breken alle ≈ 1,75 bruggen per molecuul. In kJ/mol? **23** (±2). (Vereenvoudigd: zonder volumewerk en andere bijdragen.)
 3. MK · Wat leer je uit 1 en 2? **beide schattingen geven ≈ 20–25 kJ/mol: het brugmodel is consistent** / smelten kost meer per brug / verdampen breekt geen bruggen / de schatting klopt niet
-4. GT · RT bij 25 °C in kJ/mol? **2,48** (±0,02). Hoeveel keer RT is een H-brug van 20 kJ/mol? **≈ 8**
+4. GT · RT bij 25 °C in kJ/mol? **2,48** (±0,02). Om 1 mol waterstofbruggen te verbreken is ongeveer 20 kJ nodig (de bindingsenergie). Hoeveel keer RT is dat? **≈ 8**
 5. MK · Waarom is een H-brug ongeveer lineair (O–H···O ≈ 180°)? **de aantrekking tussen δ+ en het vrije elektronenpaar is het sterkst in één lijn** / door de zwaartekracht / toeval / door de rooster­constante
 6. MK · Levensduur van een H-brug in vloeibaar water? **≈ picoseconden (10⁻¹² s)** / seconden / uren / milliseconden
 7. MK · Gevolg van 6 voor "geheugen" van water? **de structuur past zich binnen ns aan de temperatuur aan; geen geheugen van eerder** / water onthoudt vormen / water onthoudt stoffen / bruggen zijn permanent
