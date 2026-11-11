@@ -9,7 +9,7 @@ using WaterSim.Sim;
 namespace WaterSim.UI
 {
     /// <summary>
-    /// Tekenveld voor de opdracht "teken waterstofbruggen": structuurformules met vrije elektronenparen (••).
+    /// Tekenveld voor de opdracht "teken waterstofbruggen": structuurformules (zonder vrije elektronenparen).
     /// Sleep van een H-atoom naar een atoom van een ander molecuul om een brug te tekenen; tik op een brug om hem weg
     /// te halen. Na het controleren kleuren goede bruggen blauw en foute rood. Leest en schrijft alleen de lijst met
     /// bruggen die de quiz bijhoudt; de beoordeling zit in <see cref="HBrugRegels"/>.
@@ -148,24 +148,7 @@ namespace WaterSim.UI
                     if (orde == 2) { Tekenhulp.Lijn(vh, p0 + n * dik * 1.3f, p1 + n * dik * 1.3f, dik, Binding); Tekenhulp.Lijn(vh, p0 - n * dik * 1.3f, p1 - n * dik * 1.3f, dik, Binding); }
                     else Tekenhulp.Lijn(vh, p0, p1, dik, Binding);
                 }
-                // vrije elektronenparen: twee puntjes, weg van de bindingen
-                for (int i = 0; i < m.Atomen.Length; i++)
-                {
-                    int paren = m.VrijeParen(i);
-                    if (paren == 0) continue;
-                    Vector2 som = Vector2.zero;
-                    foreach (var (x, y, _) in m.Bindingen) { if (x == i) som += (a[y] - a[i]).normalized; else if (y == i) som += (a[x] - a[i]).normalized; }
-                    Vector2 basis = som.sqrMagnitude > 1e-4f ? -som.normalized : Vector2.up;
-                    for (int k = 0; k < paren; k++)
-                    {
-                        float hoek = paren == 1 ? 0f : (k == 0 ? -42f : 42f);
-                        var r = (Vector2)(Quaternion.Euler(0, 0, hoek) * basis);
-                        var plek = a[i] + r * schaal * 0.62f;
-                        var dw = new Vector2(-r.y, r.x) * schaal * 0.11f;
-                        Tekenhulp.Schijf(vh, plek + dw, Mathf.Max(1.6f, schaal * 0.065f), Binding, 8);
-                        Tekenhulp.Schijf(vh, plek - dw, Mathf.Max(1.6f, schaal * 0.065f), Binding, 8);
-                    }
-                }
+                // vrije elektronenparen tekenen we bewust niet: leerlingen leren alleen dat O 2 en N 1 waterstofbrug kan ontvangen
             }
             // bruggen (stippellijn); rood als ze fout zijn
             for (int k = 0; k < Bruggen.Count; k++)
