@@ -41,12 +41,12 @@ namespace WaterSim.UI
         public static bool Nep => false;
 #endif
 
-        // Ad-unit-ID's van Water.sim (aanmaken in AdMob). Zolang ze leeg zijn, gebruikt de app Google's test-ID's.
+        // Ad-unit-ID's van Water.sim (AdMob). Laat je er een leeg, dan gebruikt de app daar Google's test-ID.
 #if UNITY_ANDROID
-        const string EchteBanner = "", EchteInterstitial = "";
+        const string EchteBanner = "ca-app-pub-6923727980694793/7703937959", EchteInterstitial = "ca-app-pub-6923727980694793/2991647265";
         const string TestBanner = "ca-app-pub-3940256099942544/6300978111", TestInterstitial = "ca-app-pub-3940256099942544/1033173712";
 #elif UNITY_IOS
-        const string EchteBanner = "", EchteInterstitial = "";
+        const string EchteBanner = "ca-app-pub-6923727980694793/9727466065", EchteInterstitial = "ca-app-pub-6923727980694793/2451611271";
         const string TestBanner = "ca-app-pub-3940256099942544/2934735716", TestInterstitial = "ca-app-pub-3940256099942544/4411468910";
 #else
         const string EchteBanner = "", EchteInterstitial = "", TestBanner = "", TestInterstitial = "";
@@ -192,6 +192,8 @@ namespace WaterSim.UI
             if (!zonderControle && !ConsentInformation.CanRequestAds()) return;     // eerst het toestemmingsvenster
             gestart = true;
             CancelInvoke(nameof(TimeoutToestemming));
+            // de app is voor scholieren vanaf 14 jaar: alleen advertenties die geschikt zijn voor tieners
+            MobileAds.SetRequestConfiguration(new RequestConfiguration { MaxAdContentRating = MaxAdContentRating.T });
             MobileAds.Initialize(_ => { ToonBanner(); LaadInterstitial(); });
         }
 
