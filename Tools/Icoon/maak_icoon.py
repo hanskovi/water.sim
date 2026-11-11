@@ -4,8 +4,10 @@ oranje V onder de 2 toegevoegd 11 nov 2026, zie Docs/Mockups/icoon_hex_keuze.png
 Gebruik:  python3 Tools/Icoon/maak_icoon.py
 Uitvoer:
   Assets/Icoon/icoon_1024.png          vierkant, zonder doorzichtigheid (iOS, App Store, standaard)
-  Assets/Icoon/android_achtergrond.png Android adaptief icoon: achtergrondlaag (1024)
-  Assets/Icoon/android_voorgrond.png   Android adaptief icoon: H2O, kleiner, binnen de veilige zone (1024)
+  Assets/Icoon/android_rond.png        Android rond icoon (oudere toestellen): eigen ontwerp, H2O zo groot mogelijk
+  Assets/Icoon/android_achtergrond.png Android adaptief icoon: achtergrondlaag; het ronde ontwerp in het zichtbare
+                                       middendeel (72 van 108 dp), de rand aangevuld (alleen te zien bij parallax)
+  Assets/Icoon/android_voorgrond.png   Android adaptief icoon: H2O van het ronde ontwerp, op dezelfde plek
   Docs/Icoon/icoon_store_512.png       Play Store (512, vierkant)
   Docs/Icoon/voorbeeld.png             voorbeeld met afgeronde hoeken en kleine maten
 
@@ -319,7 +321,27 @@ def rond_icoon():
     ImageDraw.Draw(m).ellipse([0, 0, MAAT - 1, MAAT - 1], fill=255)
     rond.putalpha(m)
     print(f"rond icoon: H2O {breedte:.0f} van 120 breed, midden op {midden_y}")
-    return rond
+    return rond, klein(bg), klein(letters)
+
+
+ZICHTBAAR = 72 / 108          # adaptief icoon: de launcher toont het middelste 72 van de 108 dp
+
+
+def adaptief(bg_rond, letters_rond):
+    """Android adaptief: het ronde ontwerp precies in het zichtbare middendeel. De rand eromheen (alleen te zien bij
+    parallax) wordt aangevuld met de randpixels van de achtergrond."""
+    z = round(MAAT * ZICHTBAAR); o = (MAAT - z) // 2
+    bgk = bg_rond.convert("RGB").resize((z, z), Image.LANCZOS)
+    achter = Image.new("RGB", (MAAT, MAAT))
+    achter.paste(bgk.crop((0, 0, z, 1)).resize((z, o)), (o, 0))                     # boven: lucht doortrekken
+    achter.paste(bgk.crop((0, z - 1, z, z)).resize((z, MAAT - o - z)), (o, o + z))  # onder
+    achter.paste(bgk, (o, o))
+    kolom_l = achter.crop((o, 0, o + 1, MAAT)).resize((o, MAAT))
+    kolom_r = achter.crop((o + z - 1, 0, o + z, MAAT)).resize((MAAT - o - z, MAAT))
+    achter.paste(kolom_l, (0, 0)); achter.paste(kolom_r, (o + z, 0))
+    voor = Image.new("RGBA", (MAAT, MAAT), (0, 0, 0, 0))
+    voor.alpha_composite(letters_rond.resize((z, z), Image.LANCZOS), (o, o))
+    return achter, voor
 
 
 def main():
@@ -332,15 +354,13 @@ def main():
     icoon.save(os.path.join(UIT_ASSETS, "icoon_1024.png"))
     icoon.resize((512, 512), Image.LANCZOS).save(os.path.join(UIT_DOCS, "icoon_store_512.png"))
 
-    # Android adaptief: 108 dp laag, veilige zone 66 dp in het midden → H2O op ~58 % van de breedte.
-    # De letters staan daar kleiner, dus de zeshoek met de oranje V komt op een eigen plek onder die 2.
-    letters_a = h2o(120 * 0.58)
-    bg_a = achtergrond(twee=twee_plek(letters_a), schaal=120 * 0.58 / (120 - 2 * MARGE))
-    klein(bg_a).convert("RGB").save(os.path.join(UIT_ASSETS, "android_achtergrond.png"))
-    klein(letters_a).save(os.path.join(UIT_ASSETS, "android_voorgrond.png"))
     # Android rond icoon (oudere toestellen): een eigen ontwerp, zo groot mogelijk binnen de cirkel
-    rond1024 = rond_icoon()
+    rond1024, bg_rond, letters_rond = rond_icoon()
     rond1024.save(os.path.join(UIT_ASSETS, "android_rond.png"))
+    # Android adaptief (Android 8+): hetzelfde ronde ontwerp in het zichtbare middendeel van de twee lagen
+    achter_a, voor_a = adaptief(bg_rond, letters_rond)
+    achter_a.save(os.path.join(UIT_ASSETS, "android_achtergrond.png"))
+    voor_a.save(os.path.join(UIT_ASSETS, "android_voorgrond.png"))
 
     # voorbeeld: afgerond groot + kleine maten, en de Android-cirkel
     vb = Image.new("RGBA", (1024 + 40 + 600, 1024), (233, 238, 242, 255))
@@ -350,6 +370,13 @@ def main():
         vb.alpha_composite(afgerond(icoon.convert("RGBA").resize((m, m), Image.LANCZOS)), (x, 40))
         x += m + 20
     vb.alpha_composite(rond1024.resize((300, 300), Image.LANCZOS), (1064, 300))
+    # adaptief icoon zoals een launcher het toont: het middelste 72 van 108 dp, als cirkel
+    zicht = round(MAAT * ZICHTBAAR); r0 = (MAAT - zicht) // 2
+    ad = Image.alpha_composite(achter_a.convert("RGBA"), voor_a).crop((r0, r0, r0 + zicht, r0 + zicht)).resize((300, 300), Image.LANCZOS)
+    m = Image.new("L", (300, 300), 0)
+    ImageDraw.Draw(m).ellipse([0, 0, 299, 299], fill=255)
+    ad.putalpha(m)
+    vb.alpha_composite(ad, (1064, 640))
     vb.save(os.path.join(UIT_DOCS, "voorbeeld.png"))
     print("klaar")
 
