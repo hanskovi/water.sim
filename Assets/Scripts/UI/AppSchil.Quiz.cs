@@ -100,7 +100,7 @@ namespace WaterSim.UI
             void Verder()
             {
                 quizIndex++;
-                if (laatste && QuizLevel == 2) quizTekenen = true;
+                if (laatste && QuizLevel == 2) { quizTekenen = true; NieuweTekenopdracht(); }
                 else NieuweVraag();
                 Bouw();
             }
@@ -249,14 +249,117 @@ namespace WaterSim.UI
             Pilknop(rij.transform, Teksten.T("quiz.sluiten"), SluitQuiz);
         }
 
-        // level 2: tekenopdracht na de 3 vragen (wordt in de volgende stap ingevuld)
+        // ---------- level 2: tekenopdracht "teken waterstofbruggen" (na de 3 vragen, één keer) ----------
+
+        readonly System.Collections.Generic.List<Tekenveld.Plaatsing> tekenMoleculen = new System.Collections.Generic.List<Tekenveld.Plaatsing>();
+        readonly System.Collections.Generic.List<HBrugRegels.Brug> tekenBruggen = new System.Collections.Generic.List<HBrugRegels.Brug>();
+        HBrugRegels.Oordeel[] tekenOordelen;
+        bool tekenRegelsOpen, tekenGelukt;
+        int tekenPunten;
+        Molecuul2D tekenA, tekenB;
+
+        // 6 moleculen (3 van elke soort) in 2 kolommen × 3 rijen, om en om, met een kleine draai
+        void NieuweTekenopdracht()
+        {
+            (tekenA, tekenB) = Molecuulbibliotheek.Kies(quizNiveau, quizRnd);
+            tekenMoleculen.Clear(); tekenBruggen.Clear(); tekenOordelen = null; tekenRegelsOpen = false; tekenGelukt = false;
+            for (int rij = 0; rij < 3; rij++)
+                for (int kol = 0; kol < 2; kol++)
+                {
+                    var m = (rij + kol) % 2 == 0 ? tekenA : tekenB;
+                    bool klein = m.Atomen.Length <= 5;
+                    float hoek = klein ? (float)quizRnd.NextDouble() * 360f : ((float)quizRnd.NextDouble() - 0.5f) * 40f + (quizRnd.Next(2) == 0 ? 0f : 180f);
+                    var plek = new Vector2(0.25f + kol * 0.5f + ((float)quizRnd.NextDouble() - 0.5f) * 0.06f,
+                                           1f - (rij + 0.5f) / 3f + ((float)quizRnd.NextDouble() - 0.5f) * 0.04f);
+                    tekenMoleculen.Add(new Tekenveld.Plaatsing { Mol = m, Plek = plek, Hoek = hoek });
+                }
+        }
+
+        static string MolNaam(Molecuul2D m) => Teksten.T("mol." + m.Sleutel);
+
         void BouwTekenopdracht(Transform ouder)
         {
-            Tekst(ouder, "Opdracht", Teksten.T("quiz.teken.titel"), 17f, Color.white, TextAlignmentOptions.TopLeft, true, true);
-            Tekst(ouder, "Uitleg", Teksten.T("quiz.teken.binnenkort"), 13.5f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
-            var verder = Pilknop(ouder, Teksten.T("quiz.volgende"), () => { quizTekenen = false; Bouw(); });
-            Oranje(verder.img, 8f); verder.t.fontStyle = FontStyles.Bold;
-            LE(verder.img.gameObject, prefH: 40f);
+            if (tekenA == null || tekenMoleculen.Count == 0) NieuweTekenopdracht();
+            int nodig = HBrugRegels.Nodig(quizNiveau);
+            bool gecontroleerd = tekenOordelen != null;
+
+            Tekst(ouder, "Opdracht", string.Format(Teksten.T("quiz.teken.opdracht"), nodig, MolNaam(tekenA), MolNaam(tekenB)),
+                  13.5f, Color.white, TextAlignmentOptions.TopLeft, false, true);
+
+            if (tekenRegelsOpen)
+            {
+                var rv = Vlak(ouder, "Regels", new Color(1f, 1f, 1f, 0.06f), 10f);
+                LE(rv.gameObject, flexH: 1f, minH: 200f);
+                var rt = Tekst(rv.transform, "Tekst", Teksten.T("quiz.teken.regeltekst"), 13f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+                Vul(rt.rectTransform, 12, 10, 12, 10);
+                rt.enableAutoSizing = true; rt.fontSizeMin = 9f; rt.fontSizeMax = 13f;
+            }
+            else
+            {
+                var go = new GameObject("Tekenveld", typeof(RectTransform));
+                go.transform.SetParent(ouder, false);
+                var veld = go.AddComponent<Tekenveld>();
+                veld.color = Color.white;
+                veld.Font = Vet;
+                var achter = Lin(Hex("05293A")); achter.a = 1f; veld.Achter = achter;
+                veld.Moleculen = tekenMoleculen; veld.Bruggen = tekenBruggen; veld.Oordelen = tekenOordelen;
+                veld.Vergrendeld = gecontroleerd;
+                LE(go, flexH: 1f, minH: 220f);
+                veld.Ververs();
+
+                var model = Tekst(ouder, "Model", Teksten.T("quiz.teken.model"), 10.5f, new Color(1f, 1f, 1f, 0.55f), TextAlignmentOptions.Center);
+                LE(model.gameObject, prefH: 14f);
+                TextMeshProUGUI teller = null;
+                veld.Gewijzigd = () => { if (teller != null) teller.text = string.Format(Teksten.T("quiz.teken.geteld"), tekenBruggen.Count); };
+
+                if (!gecontroleerd)
+                {
+                    var rij = Rij(ouder, "Knoppen", 40f, 8f);
+                    teller = Tekst(rij.transform, "Teller", string.Format(Teksten.T("quiz.teken.geteld"), tekenBruggen.Count), 12.5f, IJsTekst);
+                    LE(teller.gameObject, prefW: 84f);
+                    Pilknop(rij.transform, Teksten.T("quiz.teken.wis"), () => { tekenBruggen.Clear(); veld.Ververs(); veld.Gewijzigd(); });
+                    Pilknop(rij.transform, Teksten.T("quiz.teken.regels"), () => { tekenRegelsOpen = true; Bouw(); });
+                    var c = Pilknop(rij.transform, Teksten.T("quiz.controleer"), ControleerTekening, 1.4f);
+                    Oranje(c.img, 8f); c.t.fontStyle = FontStyles.Bold;
+                    return;
+                }
+            }
+
+            if (tekenRegelsOpen)
+            {
+                var terug = Pilknop(ouder, Teksten.T("quiz.teken.tekening"), () => { tekenRegelsOpen = false; Bouw(); });
+                LE(terug.img.gameObject, prefH: 40f);
+                return;
+            }
+
+            // uitslag met uitleg per soort fout
+            int goed = 0; var soorten = new System.Collections.Generic.List<HBrugRegels.Oordeel>();
+            foreach (var o in tekenOordelen) { if (o == HBrugRegels.Oordeel.Goed) goed++; else if (!soorten.Contains(o)) soorten.Add(o); }
+            string uitslag = tekenGelukt ? Teksten.T("quiz.teken.goed").Replace("{0}", goed.ToString()) + (quizNieuweBeste ? " " + Teksten.T("quiz.teken.beste") : "") + $" +{tekenPunten}"
+                           : goed < nodig ? string.Format(Teksten.T("quiz.teken.tekort"), goed, nodig) : "";
+            foreach (var o in soorten) uitslag += (uitslag != "" ? "\n" : "") + "• " + Teksten.T("quiz.teken." + o);
+            var fb = Tekst(ouder, "Uitslag", uitslag, 12.5f, tekenGelukt ? Lin(Hex("8BE0A4")) : Lin(Hex("FFB48A")), TextAlignmentOptions.TopLeft, true, true);
+            fb.enableAutoSizing = true; fb.fontSizeMin = 9.5f; fb.fontSizeMax = 12.5f;
+            var vg = Pilknop(ouder, Teksten.T("quiz.volgende"), () => { quizTekenen = false; tekenA = null; tekenMoleculen.Clear(); Bouw(); });
+            Oranje(vg.img, 8f); vg.t.fontStyle = FontStyles.Bold;
+            LE(vg.img.gameObject, prefH: 40f);
+        }
+
+        void ControleerTekening()
+        {
+            if (tekenOordelen != null) return;
+            var mols = new System.Collections.Generic.List<Molecuul2D>();
+            foreach (var p in tekenMoleculen) mols.Add(p.Mol);
+            tekenOordelen = HBrugRegels.Beoordeel(mols, tekenBruggen);
+            int goed = 0; bool fout = false;
+            foreach (var o in tekenOordelen) { if (o == HBrugRegels.Oordeel.Goed) goed++; else fout = true; }
+            tekenGelukt = goed >= HBrugRegels.Nodig(quizNiveau) && !fout;
+            quizNieuweBeste = false; tekenPunten = 0;
+            if (tekenGelukt) { tekenPunten = Quiz.PuntenTekenen(quizNiveau); quizNieuweBeste = quizStreak.Goed(tekenPunten); }
+            else quizStreak.Fout();
+            PlayerPrefs.SetInt(StreakSleutel, quizStreak.Beste);
+            PlayerPrefs.SetInt(StreakSleutel + ".nu", quizStreak.Huidig);
+            Bouw();
         }
     }
 }
