@@ -88,7 +88,27 @@ namespace WaterSim.UI
         void Update()
         {
             lock (hoofdThread) while (hoofdThread.Count > 0) hoofdThread.Dequeue()?.Invoke();
+#if UNITY_EDITOR
+            NepBannerBovenop();
+#endif
         }
+
+#if UNITY_EDITOR
+        // De nep-banner van de AdMob-SDK in de editor is een Canvas met sorteervolgorde 0; de interface van de app (100)
+        // ligt er dan overheen. Op een toestel is de banner een systeemvenster en ligt hij altijd bovenop; hier doen we
+        // dat na: boven de interface, onder de interstitials (500 en 32767).
+        const int BannerVolgorde = 400;
+        float volgendeBannerCheck;
+
+        void NepBannerBovenop()
+        {
+            if (Time.unscaledTime < volgendeBannerCheck) return;
+            volgendeBannerCheck = Time.unscaledTime + 0.5f;
+            foreach (var c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+                if (c.isRootCanvas && c.sortingOrder < BannerVolgorde && c.name.Contains("ADAPTIVE"))
+                    c.sortingOrder = BannerVolgorde;
+        }
+#endif
 
         // ---------- interstitial ----------
 
