@@ -1505,7 +1505,7 @@ namespace WaterSim.UI
             if (tb == null || !tb.escapeKey.wasPressedThisFrame) return;
             if (menuOpen) { menuOpen = false; Bouw(); return; }
             if (infoOpen) { infoOpen = false; return; }
-            if (quizOpen) { NaRonde(SluitQuiz); return; }
+            if (quizOpen) { SluitQuiz(); return; }
             if (klimaatLijstOpen) { klimaatLijstOpen = false; return; }
             if (volledig) { volledig = false; return; }
             if (pagina == Pagina.Sim) { ToonPagina(Pagina.Start); return; }

@@ -8,13 +8,17 @@ using static WaterSim.UI.UIBouw;
 namespace WaterSim.UI
 {
     /// <summary>
-    /// De quiz bij level 1 en 2: een ronde van 10 vragen (meerkeuze of getal) per niveau, met een streak
-    /// (punten achter elkaar goed) en de beste streak per level en niveau. Na een ronde: een interstitial.
+    /// De quiz bij level 1 en 2: per keer 3 vragen (meerkeuze of getal) uit het gekozen niveau, met een streak
+    /// (punten achter elkaar goed, loopt door over de keren heen) en de beste streak per level en niveau.
+    /// Bij level 2 komt na de 3 vragen één keer de opdracht "teken waterstofbruggen".
+    /// Interstitial: alleen als vraag 3 fout is, en dan met 50 % kans.
     /// Het scherm wordt bij elke stap opnieuw opgebouwd (Bouw), net als de rest van de interface.
     /// </summary>
     public partial class AppSchil
     {
-        bool quizOpen, quizBeantwoord, quizLaatsteGoed, quizNieuweBeste;
+        bool quizOpen, quizBeantwoord, quizLaatsteGoed, quizNieuweBeste, quizTekenen;
+        const int VragenPerKeer = 3;
+        const float KansInterstitialBijFout = 0.5f;
         int quizNiveau = -1, quizIndex, quizAantalGoed, quizGekozen = -1;
         int[] quizVolgorde, quizOptieVolgorde;
         string quizInvoer = "";
@@ -23,7 +27,7 @@ namespace WaterSim.UI
 
         int QuizLevel => level + 1;
         string StreakSleutel => $"watersim.streak.{QuizLevel}.{quizNiveau}";
-        bool QuizKlaar => quizVolgorde != null && quizIndex >= quizVolgorde.Length;
+        bool QuizKlaar => quizVolgorde != null && quizIndex >= quizVolgorde.Length && !quizTekenen;
 
         // knop in het paneel van level 1 en 2
         void Quizknop(Transform ouder)
@@ -50,9 +54,11 @@ namespace WaterSim.UI
         void NieuweRonde()
         {
             var vragen = Quizvragen.Voor(QuizLevel, quizNiveau);
-            quizVolgorde = Quiz.Schud(vragen.Count, quizRnd);
-            quizIndex = 0; quizAantalGoed = 0;
-            quizStreak = new Streak(PlayerPrefs.GetInt(StreakSleutel, 0));
+            var alle = Quiz.Schud(vragen.Count, quizRnd);
+            quizVolgorde = new int[Mathf.Min(VragenPerKeer, alle.Length)];
+            System.Array.Copy(alle, quizVolgorde, quizVolgorde.Length);
+            quizIndex = 0; quizAantalGoed = 0; quizTekenen = false;
+            quizStreak = new Streak(PlayerPrefs.GetInt(StreakSleutel, 0), PlayerPrefs.GetInt(StreakSleutel + ".nu", 0));
             NieuweVraag();
         }
 
@@ -75,11 +81,31 @@ namespace WaterSim.UI
             if (goed) { quizAantalGoed++; quizNieuweBeste = quizStreak.Goed(1); }
             else quizStreak.Fout();
             PlayerPrefs.SetInt(StreakSleutel, quizStreak.Beste);
+            PlayerPrefs.SetInt(StreakSleutel + ".nu", quizStreak.Huidig);       // de streak loopt door naar de volgende keer
             Bouw();
         }
 
-        // na de ronde: eerst (misschien) een advertentie, dan verder
-        void NaRonde(Action verder) => (Advertenties.Instance != null ? (Action<Action>)Advertenties.Instance.ToonInterstitial : a => a())(verder);
+        // na de laatste vraag: alleen bij een fout antwoord, en dan met 50 % kans, eerst een interstitial
+        void NaLaatsteVraag(Action verder)
+        {
+            if (!quizLaatsteGoed && Advertenties.Instance != null && UnityEngine.Random.value < KansInterstitialBijFout)
+                Advertenties.Instance.ToonInterstitial(verder);
+            else verder();
+        }
+
+        // naar de volgende stap: volgende vraag, (level 2) de tekenopdracht, of het einde
+        void VolgendeStap()
+        {
+            bool laatste = quizIndex + 1 >= quizVolgorde.Length;
+            void Verder()
+            {
+                quizIndex++;
+                if (laatste && QuizLevel == 2) quizTekenen = true;
+                else NieuweVraag();
+                Bouw();
+            }
+            if (laatste) NaLaatsteVraag(Verder); else Verder();
+        }
 
         void BouwQuiz(RectTransform vrij)
         {
@@ -97,7 +123,7 @@ namespace WaterSim.UI
             LE(sluit.gameObject, prefW: 30f);
             var x = Tekst(sluit.transform, "x", "×", 20f, Color.white, TextAlignmentOptions.Center);
             Vul(x.rectTransform, 0, 2, 0, 0);
-            Knop(sluit, () => NaRonde(SluitQuiz));
+            Knop(sluit, SluitQuiz);
 
             // niveau (een andere keuze begint een nieuwe ronde)
             var tabs = Rij(vak.transform, "Niveaus", 30f, 6f);
@@ -117,7 +143,7 @@ namespace WaterSim.UI
             // stand: vraagnummer en streak
             var stand = Rij(vak.transform, "Stand", 22f, 8f);
             int totaal = quizVolgorde?.Length ?? 0;
-            var nr = Tekst(stand.transform, "Nummer", QuizKlaar ? "" : string.Format(Teksten.T("quiz.vraag"), quizIndex + 1, totaal), 12.5f, IJsTekst);
+            var nr = Tekst(stand.transform, "Nummer", QuizKlaar || quizTekenen ? "" : string.Format(Teksten.T("quiz.vraag"), quizIndex + 1, totaal), 12.5f, IJsTekst);
             LE(nr.gameObject, flexW: 1f);
             var sp = Vlak(stand.transform, "Streak", Color.white, 8f);
             Oranje(sp, 8f); sp.raycastTarget = false;
@@ -125,6 +151,7 @@ namespace WaterSim.UI
             Vul(st.rectTransform, 8, 0, 8, 0);
             LE(sp.gameObject, prefW: st.preferredWidth + 18f);
 
+            if (quizTekenen) { BouwTekenopdracht(vak.transform); return; }
             if (QuizKlaar) { BouwQuizEinde(vak.transform, totaal); return; }
 
             var v = HuidigeVraag();
@@ -135,11 +162,11 @@ namespace WaterSim.UI
 
             if (quizBeantwoord)
             {
-                string goedAntwoord = v.IsGetal ? Teksten.Getal(v.Antwoord, "0.###") + (v.Eenheid != "" ? " " + v.Eenheid : "") : v.Optie(0);
+                string goedAntwoord = !v.IsGetal ? v.Optie(0) : (v.Weergave != "" ? Teksten.Kies(v.Weergave, v.Weergave.Replace(',', '.')) : Teksten.Getal(v.Antwoord, "0.###")) + (v.Eenheid != "" && !v.Weergave.Contains("10") ? " " + v.Eenheid : "");
                 var fb = Tekst(vak.transform, "Uitslag", quizLaatsteGoed ? Teksten.T(quizNieuweBeste ? "quiz.nieuwbeste" : "quiz.goed") + " +1"
                                                                          : string.Format(Teksten.T("quiz.fout"), goedAntwoord),
                                14f, quizLaatsteGoed ? Lin(Hex("8BE0A4")) : Lin(Hex("FFB48A")), TextAlignmentOptions.TopLeft, true, true);
-                var vg = Pilknop(vak.transform, Teksten.T("quiz.volgende"), () => { quizIndex++; NieuweVraag(); Bouw(); });
+                var vg = Pilknop(vak.transform, Teksten.T("quiz.volgende"), VolgendeStap);
                 Oranje(vg.img, 8f); vg.t.fontStyle = FontStyles.Bold;
                 LE(vg.img.gameObject, prefH: 40f);
             }
@@ -210,16 +237,26 @@ namespace WaterSim.UI
         void Controleer(Quizvraag v)
         {
             if (quizBeantwoord || !Quiz.LeesGetal(quizInvoer, out _)) return;     // eerst een getal intypen
-            Beantwoord(Quiz.GetalKlopt(quizInvoer, v.Antwoord, v.Marge));
+            Beantwoord(Quiz.GetalKlopt(quizInvoer, v.Antwoord, v.Marge, v.Macht, v.MinDecimalen));
         }
 
         void BouwQuizEinde(Transform ouder, int totaal)
         {
             Tekst(ouder, "Klaar", string.Format(Teksten.T("quiz.klaar"), quizAantalGoed, totaal), 18f, Color.white, TextAlignmentOptions.TopLeft, true, true);
             var rij = Rij(ouder, "Knoppen", 42f, 8f);
-            var nog = Pilknop(rij.transform, Teksten.T("quiz.nogeen"), () => NaRonde(() => { NieuweRonde(); Bouw(); }));
+            var nog = Pilknop(rij.transform, Teksten.T("quiz.nogeen"), () => { NieuweRonde(); Bouw(); });
             Oranje(nog.img, 8f); nog.t.fontStyle = FontStyles.Bold;
-            Pilknop(rij.transform, Teksten.T("quiz.sluiten"), () => NaRonde(SluitQuiz));
+            Pilknop(rij.transform, Teksten.T("quiz.sluiten"), SluitQuiz);
+        }
+
+        // level 2: tekenopdracht na de 3 vragen (wordt in de volgende stap ingevuld)
+        void BouwTekenopdracht(Transform ouder)
+        {
+            Tekst(ouder, "Opdracht", Teksten.T("quiz.teken.titel"), 17f, Color.white, TextAlignmentOptions.TopLeft, true, true);
+            Tekst(ouder, "Uitleg", Teksten.T("quiz.teken.binnenkort"), 13.5f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            var verder = Pilknop(ouder, Teksten.T("quiz.volgende"), () => { quizTekenen = false; Bouw(); });
+            Oranje(verder.img, 8f); verder.t.fontStyle = FontStyles.Bold;
+            LE(verder.img.gameObject, prefH: 40f);
         }
     }
 }

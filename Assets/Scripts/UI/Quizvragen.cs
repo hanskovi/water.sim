@@ -9,6 +9,12 @@ namespace WaterSim.UI
         public (string nl, string en)[] Opties;          // null bij een getalvraag; Opties[0] is het goede antwoord
         public double Antwoord, Marge;
         public string Eenheid = "";
+        /// <summary>Het antwoord staat in eenheden van 10^Macht (de leerling mag ook "6,022e23" typen).</summary>
+        public int Macht;
+        /// <summary>Minimaal aantal cijfers achter de komma in het antwoord.</summary>
+        public int MinDecimalen;
+        /// <summary>Hoe het goede antwoord wordt getoond (leeg: het getal zelf).</summary>
+        public string Weergave = "";
 
         public bool IsGetal => Opties == null;
         public string Vraag => Teksten.Kies(VraagNL, VraagEN);
@@ -22,8 +28,8 @@ namespace WaterSim.UI
     public static class Quizvragen
     {
         static Quizvraag MK(string nl, string en, params (string, string)[] opties) => new Quizvraag { VraagNL = nl, VraagEN = en, Opties = opties };
-        static Quizvraag GT(string nl, string en, double antwoord, double marge, string eenheid = "") =>
-            new Quizvraag { VraagNL = nl, VraagEN = en, Antwoord = antwoord, Marge = marge, Eenheid = eenheid };
+        static Quizvraag GT(string nl, string en, double antwoord, double marge, string eenheid = "", int macht = 0, int minDecimalen = 0, string weergave = "") =>
+            new Quizvraag { VraagNL = nl, VraagEN = en, Antwoord = antwoord, Marge = marge, Eenheid = eenheid, Macht = macht, MinDecimalen = minDecimalen, Weergave = weergave };
 
         /// <summary>De vragen van dit level (1 of 2) en niveau, of een lege lijst.</summary>
         public static IReadOnlyList<Quizvraag> Voor(int level, int niveau)
@@ -69,10 +75,10 @@ namespace WaterSim.UI
             MK("Waarom is water een dipool?", "Why is water a dipole?",
                ("door de polaire O–H-bindingen en de geknikte vorm", "because of the polar O–H bonds and the bent shape"), ("omdat het vloeibaar is", "because it is liquid"), ("omdat het ionen bevat", "because it contains ions"), ("omdat het zuurstof bevat", "because it contains oxygen")),
             GT("Hoeveel vrije elektronenparen heeft het O-atoom in water?", "How many lone pairs does the O atom in water have?", 2, 0),
-            GT("Wat is de molecuulmassa van H₂O?", "What is the molecular mass of H₂O?", 18.0, 0.1, "u"),
+            GT("Wat is de molecuulmassa van H₂O? Geef minstens 1 cijfer achter de komma.", "What is the molecular mass of H₂O? Give at least 1 decimal.", 18.015, 0.02, "u", 0, 1, "18,0 (18,015)"),
             MK("Stel dat water recht was, zoals CO₂. Dan zou water…", "Suppose water were straight, like CO₂. Then water would…",
                ("geen dipool zijn", "not be a dipole"), ("zwaarder zijn", "be heavier"), ("niet bestaan", "not exist"), ("sterker polair zijn", "be more polar")),
-            GT("Hoeveel moleculen zitten er in 1,0 g water? Geef het antwoord in eenheden van 10²².", "How many molecules are in 1.0 g of water? Give the answer in units of 10²².", 3.34, 0.1, "× 10²²"),
+            GT("Hoeveel moleculen zitten er in 1 mol water? (Je mag ook 6,0e23 typen.)", "How many molecules are in 1 mol of water? (You may also type 6.0e23.)", 6.022, 0.03, "× 10²³", 23, 0, "6,022 × 10²³"),
             MK("Welke binding zit binnen een watermolecuul?", "Which bond is inside a water molecule?",
                ("atoombinding (covalent)", "covalent bond"), ("ionbinding", "ionic bond"), ("metaalbinding", "metallic bond"), ("waterstofbrug", "hydrogen bond")),
             GT("Hoe lang is de O–H-binding?", "How long is the O–H bond?", 0.96, 0.02, "Å"),
@@ -94,7 +100,8 @@ namespace WaterSim.UI
             MK("Welke hybridisatie krijgt O in water meestal (vereenvoudigd model)?", "Which hybridisation is usually given to O in water (simplified model)?",
                ("sp³", "sp³"), ("sp²", "sp²"), ("sp", "sp"), ("geen", "none")),
             GT("Wat is de bindingsenergie van O–H (Binas)?", "What is the bond energy of O–H (Binas)?", 463, 10, "kJ/mol"),
-            MK("Waarom geleidt zuiver water slecht, maar niet helemaal niet?", "Why is the conductivity of pure water low but not zero?",
+            GT("Hoeveel moleculen zitten er in 1,0 g water? (Je mag ook 3,3e22 typen.)", "How many molecules are in 1.0 g of water? (You may also type 3.3e22.)", 3.34, 0.05, "× 10²²", 22, 0, "3,34 × 10²²"),
+            MK("Waarom geleidt zuiver water slecht, maar toch wél een heel klein beetje?", "Why does pure water conduct poorly, yet just a tiny bit?",
                ("autoprotolyse: een klein deel vormt H₃O⁺ en OH⁻", "autoionisation: a small part forms H₃O⁺ and OH⁻"), ("er zit altijd zout in", "there is always salt in it"), ("elektronen bewegen vrij", "electrons move freely"), ("door de dipool", "because of the dipole")),
         };
 
@@ -109,7 +116,7 @@ namespace WaterSim.UI
                ("de binding binnen het molecuul", "the bond inside the molecule"), ("de waterstofbrug", "the hydrogen bond"), ("ze zijn even sterk", "they are equally strong"), ("dat hangt van de kleur af", "that depends on the colour")),
             MK("Waarom kookt water pas bij 100 °C, terwijl het molecuul zo licht is?", "Why does water only boil at 100 °C, although the molecule is so light?",
                ("de moleculen houden elkaar stevig vast", "the molecules hold on to each other firmly"), ("water is zwaar", "water is heavy"), ("door de lucht", "because of the air"), ("door het zout", "because of the salt")),
-            MK("Waarom kan een schaatsenrijder (het insect) op water lopen?", "Why can a pond skater (the insect) walk on water?",
+            MK("Waarom kan een schaatsenrijder (of een ander insect) op water lopen?", "Why can a pond skater (or another insect) walk on water?",
                ("oppervlaktespanning: de moleculen trekken elkaar aan", "surface tension: the molecules attract each other"), ("water is hard", "water is hard"), ("het insect weegt niets", "the insect weighs nothing"), ("de lucht duwt het omhoog", "the air pushes it up")),
             MK("Waarom vormt water ronde druppels?", "Why does water form round drops?",
                ("de moleculen trekken elkaar naar binnen", "the molecules pull each other inwards"), ("door de zwaartekracht", "because of gravity"), ("door de wind", "because of the wind"), ("water is plakkerig", "water is sticky")),
@@ -137,7 +144,7 @@ namespace WaterSim.UI
                ("ethanol", "ethanol"), ("hexaan", "hexane"), ("olie", "oil"), ("tetra", "tetrachloromethane")),
             MK("Waarom heeft water een grote soortelijke warmte (4,18 J/(g·K))?", "Why does water have a large specific heat (4.18 J/(g·K))?",
                ("een deel van de warmte gaat naar het verbreken van waterstofbruggen", "part of the heat goes into breaking hydrogen bonds"), ("water is zwaar", "water is heavy"), ("water geleidt goed", "water conducts well"), ("door opgeloste lucht", "because of dissolved air")),
-            GT("Hoeveel waterstofbruggen heeft een molecuul gemiddeld in water van 90 °C (model)?", "How many hydrogen bonds does a molecule have on average in water at 90 °C (model)?", 2.9, 0.2),
+            GT("Zet in level 4 de omgeving op 90 °C en lees af: hoeveel waterstofbruggen heeft een molecuul gemiddeld?", "In level 4, set the surroundings to 90 °C and read off: how many hydrogen bonds does a molecule have on average?", 2.9, 0.2),
             MK("Welke stoffen vormen ook waterstofbruggen?", "Which substances also form hydrogen bonds?",
                ("NH₃ en HF", "NH₃ and HF"), ("CH₄ en CO₂", "CH₄ and CO₂"), ("NaCl", "NaCl"), ("O₂ en N₂", "O₂ and N₂")),
         };
@@ -148,7 +155,7 @@ namespace WaterSim.UI
             GT("Bij verdampen breken alle ≈ 1,75 bruggen per molecuul. De verdampingswarmte is 40,7 kJ/mol. Hoeveel kost één mol bruggen? (vereenvoudigd)", "On evaporation all ≈ 1.75 bonds per molecule break. The heat of vaporisation is 40.7 kJ/mol. How much does one mole of bonds take? (simplified)", 23, 2, "kJ/mol"),
             MK("Schattingen uit de smeltwarmte en uit de verdampingswarmte geven allebei ≈ 24 kJ/mol per H-brug. Wat leer je daaruit?", "Estimates from the heat of fusion and from the heat of vaporisation both give ≈ 24 kJ/mol per hydrogen bond. What do you learn from that?",
                ("het brugmodel is consistent", "the bond model is consistent"), ("smelten kost meer per brug", "melting costs more per bond"), ("bij verdampen breken geen bruggen", "no bonds break on evaporation"), ("de schatting klopt niet", "the estimate is wrong")),
-            GT("Een H-brug is ≈ 20 kJ/mol. RT bij 25 °C is 2,48 kJ/mol. Hoeveel keer RT is een H-brug?", "A hydrogen bond is ≈ 20 kJ/mol. RT at 25 °C is 2.48 kJ/mol. How many times RT is a hydrogen bond?", 8, 0.5, "× RT"),
+            GT("RT = R × T is de warmte-energie per mol (R = 8,314 J/(mol·K)). Bij 25 °C (T = 298 K) is RT = 2,48 kJ/mol. Een H-brug is ≈ 20 kJ/mol. Hoeveel keer RT is dat?", "RT = R × T is the thermal energy per mole (R = 8.314 J/(mol·K)). At 25 °C (T = 298 K) RT = 2.48 kJ/mol. A hydrogen bond is ≈ 20 kJ/mol. How many times RT is that?", 8, 0.5, "× RT"),
             MK("Waarom is een waterstofbrug bijna recht (O–H···O ≈ 180°)?", "Why is a hydrogen bond almost straight (O–H···O ≈ 180°)?",
                ("de aantrekking tussen δ+ en het vrije elektronenpaar is dan het sterkst", "the attraction between δ+ and the lone pair is strongest then"), ("door de zwaartekracht", "because of gravity"), ("toeval", "coincidence"), ("door de roosterconstante", "because of the lattice constant")),
             MK("Hoe lang leeft een waterstofbrug in vloeibaar water?", "How long does a hydrogen bond live in liquid water?",

@@ -32,7 +32,7 @@ namespace WaterSim.UI
         public static event Action PrivacyKeuzesGewijzigd;
 
         /// <summary>Minimaal aantal seconden tussen twee interstitials.</summary>
-        public const float MinTussenInterstitials = 180f;
+        public const float MinTussenInterstitials = 60f;
         float laatsteInterstitial = -1000f;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
