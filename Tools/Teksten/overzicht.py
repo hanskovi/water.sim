@@ -237,9 +237,9 @@ def maak():
         f'<td><b>{r["land"]}</b></td><td>{html.escape(r["noot"])}</td><td class="num">{getal(r["breedte"])}°</td>'
         f'<td class="num">{getal(r["koudst"])}</td><td class="num">{getal(r["warmst"])}</td>'
         f'<td class="num">{r["dag"]}</td><td class="num">{getal(r["streng"])}</td></tr>' for r in klimaat)
-    delen.append(f'''<section id="klimaat"><h2>Klimaatwaarden <span class="tel">{n_ster} met * nalopen</span></h2>
+    delen.append(f'''<section id="klimaat"><h2>Klimaatwaarden <span class="tel">{n_ster} met * (goedgekeurd)</span></h2>
 <p class="uitleg">Uit <code>Klimaat.cs</code>. Normalen 1991–2020, gemiddelde maandtemperatuur. Rijen met * zijn benaderingen uit
-secundaire bronnen; controleer die bij de officiële bron (KNMI, KMA, JMA, ECCC, NOAA, FMI, BoM, NIWA, NEA).</p>
+secundaire bronnen; nagelopen en goedgekeurd op 11 november 2026.</p>
 <div class="tabel"><table><thead><tr><th></th><th>Land</th><th>Plaats en opmerking</th><th>Breedte</th><th>Koudste maand °C</th>
 <th>Warmste maand °C</th><th>Dag koudst</th><th>Strenge winter −°C</th></tr></thead><tbody>{k_rijen}</tbody></table></div></section>''')
 

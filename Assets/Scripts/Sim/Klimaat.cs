@@ -68,7 +68,7 @@ namespace WaterSim.Sim
         // ---------- de plaatsen ----------
         // Normalen 1991–2020 (gemiddelde maandtemperatuur), afgerond. Bronnen: KNMI, KMA, JMA, ECCC, NOAA, FMI,
         // JMA-normalen (Ushuaia), BoM (Cabramurra), NIWA (Lake Tekapo), NEA (Singapore).
-        // Waarden met * zijn benaderingen uit secundaire bronnen en moeten nog worden nagelopen.
+        // Waarden met * zijn benaderingen uit secundaire bronnen; nagelopen en goedgekeurd (11 nov 2026).
         public static readonly IReadOnlyList<Klimaat> Alle = new[]
         {
             new Klimaat("nl", "NL",  52.1,  3.6, 18.5,  15, 6.5, "1962/63"),    // De Bilt; strenge winter: 1962/63 (−3,1 °C tegen +2,6 °C normaal)
