@@ -222,7 +222,12 @@ def oranje_v(midden):
     return vlak
 
 
-def achtergrond(met_stoom=True, twee=None, schaal=1.0):
+STOOM = [(20, 29, 21, 0.6), (31, 25, 16, 0.45)]   # stoompluimen: x, onderkant, hoogte, dekking (vierkant icoon)
+MARGE_ROND = 5.0              # rond icoon: ruimte tussen H2O en de cirkelrand (eenheden van 120)
+STOOM_ROND = 0.8              # rond icoon: pluimen iets korter, zodat H2O groter kan
+
+
+def achtergrond(met_stoom=True, twee=None, schaal=1.0, pluimen=None):
     """twee: plek van de 2 (uit twee_plek); dan schuift het raster zo dat er een zeshoek onder de 2 valt,
     en krijgt die zeshoek een oranje V. schaal: lettergrootte ten opzichte van het gewone icoon."""
     img = verloop(BOVEN, 0, 120).convert("RGBA")
@@ -239,8 +244,8 @@ def achtergrond(met_stoom=True, twee=None, schaal=1.0):
     if met_stoom:
         stoom = Image.new("RGBA", (S, S), (0, 0, 0, 0))
         ds = ImageDraw.Draw(stoom)
-        lijn_pad(ds, stoompluim(20, 29, 21), 3.2, (255, 255, 255, int(255 * 0.6)))
-        lijn_pad(ds, stoompluim(31, 25, 16), 3.2, (255, 255, 255, int(255 * 0.45)))
+        for (x, y, h, a) in (pluimen or STOOM):
+            lijn_pad(ds, stoompluim(x, y, h), 3.2 * min(1.0, schaal ** 0.5), (255, 255, 255, int(255 * a)))
         img = Image.alpha_composite(img, stoom)
     return img
 
@@ -255,6 +260,66 @@ def afgerond(img, rx=27):
     uit = img.copy()
     uit.putalpha(m)
     return uit
+
+
+def h_vak(letters):
+    """Linker-, rechter- en bovenrand van de H in een H2O-laag (eenheden)."""
+    a = letters.getchannel("A")
+    l, t, r_, b = a.getbbox()
+    x = l
+    while x < r_ and a.crop((x, t, x + 1, b)).getbbox():        # de H loopt door tot de eerste lege kolom
+        x += 1
+    hl, ht, hr, _ = a.crop((l, t, x, b)).getbbox()
+    return (l + hl) / K, (l + hr) / K, (t + ht) / K
+
+
+def stoom_boven_h(letters, schaal, lengte=1.0):
+    """De stoompluimen zoals in het vierkante icoon, maar meegeschaald en boven de H van deze letters."""
+    vl, vr, vt = h_vak(letters)                           # H in het vierkante icoon: x 7,0..42,4, boven 32,8
+    uit = []
+    for (x, y, h, a) in STOOM:
+        fx = (x - 7.0) / (42.4 - 7.0)
+        uit.append((vl + fx * (vr - vl), vt - (32.8 - y) * schaal, h * schaal * lengte, a))
+    return uit
+
+
+def past_in_cirkel(lagen, straal):
+    m = Image.new("L", (S, S), 255)
+    ImageDraw.Draw(m).ellipse([p(60 - straal, 60 - straal), p(60 + straal, 60 + straal)], fill=0)
+    return all(ImageChops.multiply(l.getchannel("A").point(lambda v: 255 if v > 40 else 0), m).getbbox() is None for l in lagen)
+
+
+def rond_icoon():
+    """Rond icoon: H2O zo breed mogelijk met MARGE_ROND tot de rand, stoom boven de H, oranje V onder de 2."""
+    def proef(breedte, midden_y):
+        letters = h2o(breedte, midden_y)
+        schaal = breedte / (120 - 2 * MARGE)
+        stoom = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+        ds = ImageDraw.Draw(stoom)
+        for (x, y, h, a) in stoom_boven_h(letters, schaal, STOOM_ROND):
+            lijn_pad(ds, stoompluim(x, y, h), 3.2, (255, 255, 255, 255))
+        midden, _ = zeshoek_onder_twee(twee_plek(letters), schaal)
+        v = oranje_v(midden)
+        ok = past_in_cirkel([letters], 60 - MARGE_ROND) and past_in_cirkel([stoom], 60 - 4) and past_in_cirkel([v], 60 - 4)
+        return ok, letters, schaal
+
+    beste = None
+    for midden_y in range(60, 76, 2):                     # iets lager kan ruimte geven voor de stoom
+        laag, hoog, gevonden = 60.0, 106.0, None
+        for _ in range(7):                                # binair zoeken naar de grootste breedte die past
+            mid = (laag + hoog) / 2
+            ok, letters, schaal = proef(mid, midden_y)
+            if ok: laag, gevonden = mid, (mid, midden_y, letters, schaal)
+            else: hoog = mid
+        if gevonden and (beste is None or gevonden[0] > beste[0]): beste = gevonden
+    breedte, midden_y, letters, schaal = beste
+    bg = achtergrond(twee=twee_plek(letters), schaal=schaal, pluimen=stoom_boven_h(letters, schaal, STOOM_ROND))
+    rond = klein(Image.alpha_composite(bg, letters))
+    m = Image.new("L", (MAAT, MAAT), 0)
+    ImageDraw.Draw(m).ellipse([0, 0, MAAT - 1, MAAT - 1], fill=255)
+    rond.putalpha(m)
+    print(f"rond icoon: H2O {breedte:.0f} van 120 breed, midden op {midden_y}")
+    return rond
 
 
 def main():
@@ -273,11 +338,8 @@ def main():
     bg_a = achtergrond(twee=twee_plek(letters_a), schaal=120 * 0.58 / (120 - 2 * MARGE))
     klein(bg_a).convert("RGB").save(os.path.join(UIT_ASSETS, "android_achtergrond.png"))
     klein(letters_a).save(os.path.join(UIT_ASSETS, "android_voorgrond.png"))
-    # Android rond icoon (oudere toestellen): de adaptieve lagen samen, rond uitgesneden
-    rond1024 = Image.alpha_composite(klein(bg_a), klein(letters_a))
-    mr = Image.new("L", (MAAT, MAAT), 0)
-    ImageDraw.Draw(mr).ellipse([0, 0, MAAT - 1, MAAT - 1], fill=255)
-    rond1024.putalpha(mr)
+    # Android rond icoon (oudere toestellen): een eigen ontwerp, zo groot mogelijk binnen de cirkel
+    rond1024 = rond_icoon()
     rond1024.save(os.path.join(UIT_ASSETS, "android_rond.png"))
 
     # voorbeeld: afgerond groot + kleine maten, en de Android-cirkel
@@ -287,11 +349,7 @@ def main():
     for m in (180, 120, 80, 58):
         vb.alpha_composite(afgerond(icoon.convert("RGBA").resize((m, m), Image.LANCZOS)), (x, 40))
         x += m + 20
-    rond = Image.alpha_composite(klein(bg_a), klein(letters_a)).resize((300, 300), Image.LANCZOS)
-    m = Image.new("L", (300, 300), 0)
-    ImageDraw.Draw(m).ellipse([0, 0, 299, 299], fill=255)
-    rond.putalpha(m)
-    vb.alpha_composite(rond, (1064, 300))
+    vb.alpha_composite(rond1024.resize((300, 300), Image.LANCZOS), (1064, 300))
     vb.save(os.path.join(UIT_DOCS, "voorbeeld.png"))
     print("klaar")
 
