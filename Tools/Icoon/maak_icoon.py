@@ -1,4 +1,5 @@
-"""Tekent het app-icoon van Water.sim (ontwerp: Docs/Icoon/watersim_icoon.svg, gekozen 8 nov 2026).
+"""Tekent het app-icoon van Water.sim (ontwerp: Docs/Icoon/watersim_icoon.svg, gekozen 8 nov 2026;
+oranje V onder de 2 toegevoegd 11 nov 2026, zie Docs/Mockups/icoon_hex_keuze.png).
 
 Gebruik:  python3 Tools/Icoon/maak_icoon.py
 Uitvoer:
@@ -34,6 +35,10 @@ IJS = (0xC4, 0xF4, 0xFB)
 HEX_R, HEX_W, HEX_MAX = 11.0, 1.8, 0.85
 MARGE = 7.0                   # ruimte links en rechts van H2O (van 120)
 TWEE_OPTISCH = 0.5            # plek van de 2: 0 = midden tussen de buitenranden, 1 = optisch midden op de hoogte van de 2
+ORANJE = ((0xF7, 0x88, 0x4D), (0xE8, 0x50, 0x2E))   # verloop van de oranje knoppen in de app (links-boven → rechts-onder)
+V_DIKTE = HEX_W * 2.4         # oranje V: de twee onderste zijden van de zeshoek onder de 2 (zoals de streep onder het molecuul
+                              # bij de andere scheikunde-iconen; gekozen 11 nov 2026)
+TWEE_OVERLAP = 6.1            # zoveel valt de bovenpunt van die zeshoek achter de 2 (eenheden, bij volle lettergrootte)
 
 
 def p(x, y):
@@ -72,13 +77,13 @@ def zeshoek(d, cx, cy, r, w, kleur):
     d.line(pts + [pts[0], pts[1]], fill=kleur, width=int(w * K), joint="curve")
 
 
-def ijsrooster(watervorm):
+def ijsrooster(watervorm, schuif=(0.0, 0.0)):
     laag = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(laag)
     dx = HEX_R * math.sqrt(3)
-    for j in range(8):
-        for i in range(-1, int(124 / dx) + 2):
-            zeshoek(d, i * dx + (dx / 2 if j % 2 else 0), GY - 2 + j * HEX_R * 1.5, HEX_R, HEX_W, IJS + (255,))
+    for j in range(-1, 9):
+        for i in range(-2, int(124 / dx) + 2):
+            zeshoek(d, i * dx + (dx / 2 if j % 2 else 0) + schuif[0], GY - 2 + j * HEX_R * 1.5 + schuif[1], HEX_R, HEX_W, IJS + (255,))
     # vriesverloop: onzichtbaar bij de golf, onderin HEX_MAX zichtbaar
     alfa = Image.new("L", (1, S))
     for y in range(S):
@@ -172,12 +177,62 @@ def h2o(breedte_eenheden, midden_y=60.0):
     return laag
 
 
-def achtergrond(met_stoom=True):
+def twee_plek(letters):
+    """Midden (x) en onderkant (y) van de 2 in een H2O-laag, in eenheden. De 2 is het laagste stuk inkt;
+    vanuit het midden van zijn onderste balk wordt de hele 2 opgevuld."""
+    a = letters.getchannel("A")
+    l, t, r_, b = a.getbbox()
+    binair = a.point(lambda v: 255 if v > 0 else 0)
+    y = b - int(0.2 * K)
+    rij = [binair.getpixel((x, y)) for x in range(l, r_)] + [0]
+    beste, start = (0, 0), None
+    for i, v in enumerate(rij):
+        if v == 255 and start is None: start = i
+        if v != 255 and start is not None:
+            if i - start > beste[1] - beste[0]: beste = (start, i)
+            start = None
+    ImageDraw.floodfill(binair, (l + (beste[0] + beste[1]) // 2, y), 128)
+    l2, _, r2, b2 = binair.point(lambda v: 255 if v == 128 else 0).getbbox()
+    return ((l2 + r2) / 2 / K, b2 / K)
+
+
+def zeshoek_onder_twee(twee, schaal):
+    """Midden van de zeshoek onder de 2, en de verschuiving van het raster waarmee daar een zeshoek staat."""
+    dx = HEX_R * math.sqrt(3)
+    cx, cy = twee[0], twee[1] - TWEE_OVERLAP * schaal + HEX_R
+    j = round((cy - (GY - 2)) / (HEX_R * 1.5))
+    rij_x = (dx / 2 if j % 2 else 0)
+    i = round((cx - rij_x) / dx)
+    return (cx, cy), (cx - (i * dx + rij_x), cy - (GY - 2 + j * HEX_R * 1.5))
+
+
+def oranje_v(midden):
+    """De twee onderste zijden van de zeshoek rond midden, dik, in het oranje verloop."""
+    cx, cy = midden
+    h = [(cx + HEX_R * math.cos(math.pi / 3 * k + math.pi / 6), cy + HEX_R * math.sin(math.pi / 3 * k + math.pi / 6)) for k in range(3)]
+    vorm = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    lijn_pad(ImageDraw.Draw(vorm), h, V_DIKTE, (255, 255, 255, 255))
+    vlak = Image.new("RGB", (256, 256))
+    for y in range(256):
+        for x in range(256):
+            t = (x + y) / 510
+            vlak.putpixel((x, y), tuple(int(ORANJE[0][i] + (ORANJE[1][i] - ORANJE[0][i]) * t) for i in range(3)))
+    vlak = vlak.resize((S, S)).convert("RGBA")
+    vlak.putalpha(vorm.getchannel("A"))
+    return vlak
+
+
+def achtergrond(met_stoom=True, twee=None, schaal=1.0):
+    """twee: plek van de 2 (uit twee_plek); dan schuift het raster zo dat er een zeshoek onder de 2 valt,
+    en krijgt die zeshoek een oranje V. schaal: lettergrootte ten opzichte van het gewone icoon."""
     img = verloop(BOVEN, 0, 120).convert("RGBA")
     water = watermasker()
     onder = verloop(ONDER, GY - AMP * 1.6, 122).convert("RGBA")
     img.paste(onder, (0, 0), water)
-    img = Image.alpha_composite(img, ijsrooster(water))
+    midden, schuif = zeshoek_onder_twee(twee, schaal) if twee else (None, (0.0, 0.0))
+    img = Image.alpha_composite(img, ijsrooster(water, schuif))
+    if midden:
+        img = Image.alpha_composite(img, oranje_v(midden))
     schuim = Image.new("RGBA", (S, S), (0, 0, 0, 0))   # aparte laag: anders stapelt de doorzichtigheid op
     lijn_pad(ImageDraw.Draw(schuim), golf_punten(), 2.6, SCHUIM + (int(255 * 0.95),))
     img = Image.alpha_composite(img, schuim)
@@ -205,17 +260,21 @@ def afgerond(img, rx=27):
 def main():
     os.makedirs(UIT_ASSETS, exist_ok=True)
     os.makedirs(UIT_DOCS, exist_ok=True)
-    bg = achtergrond()
-    volledig = Image.alpha_composite(bg, h2o(120 - 2 * MARGE))
+    letters = h2o(120 - 2 * MARGE)
+    bg = achtergrond(twee=twee_plek(letters))
+    volledig = Image.alpha_composite(bg, letters)
     icoon = klein(volledig).convert("RGB")
     icoon.save(os.path.join(UIT_ASSETS, "icoon_1024.png"))
     icoon.resize((512, 512), Image.LANCZOS).save(os.path.join(UIT_DOCS, "icoon_store_512.png"))
 
-    # Android adaptief: 108 dp laag, veilige zone 66 dp in het midden → H2O op ~58 % van de breedte
-    klein(bg).convert("RGB").save(os.path.join(UIT_ASSETS, "android_achtergrond.png"))
-    klein(h2o(120 * 0.58)).save(os.path.join(UIT_ASSETS, "android_voorgrond.png"))
+    # Android adaptief: 108 dp laag, veilige zone 66 dp in het midden → H2O op ~58 % van de breedte.
+    # De letters staan daar kleiner, dus de zeshoek met de oranje V komt op een eigen plek onder die 2.
+    letters_a = h2o(120 * 0.58)
+    bg_a = achtergrond(twee=twee_plek(letters_a), schaal=120 * 0.58 / (120 - 2 * MARGE))
+    klein(bg_a).convert("RGB").save(os.path.join(UIT_ASSETS, "android_achtergrond.png"))
+    klein(letters_a).save(os.path.join(UIT_ASSETS, "android_voorgrond.png"))
     # Android rond icoon (oudere toestellen): de adaptieve lagen samen, rond uitgesneden
-    rond1024 = Image.alpha_composite(klein(bg), klein(h2o(120 * 0.58)))
+    rond1024 = Image.alpha_composite(klein(bg_a), klein(letters_a))
     mr = Image.new("L", (MAAT, MAAT), 0)
     ImageDraw.Draw(mr).ellipse([0, 0, MAAT - 1, MAAT - 1], fill=255)
     rond1024.putalpha(mr)
@@ -228,7 +287,7 @@ def main():
     for m in (180, 120, 80, 58):
         vb.alpha_composite(afgerond(icoon.convert("RGBA").resize((m, m), Image.LANCZOS)), (x, 40))
         x += m + 20
-    rond = Image.alpha_composite(klein(bg), klein(h2o(120 * 0.58))).resize((300, 300), Image.LANCZOS)
+    rond = Image.alpha_composite(klein(bg_a), klein(letters_a)).resize((300, 300), Image.LANCZOS)
     m = Image.new("L", (300, 300), 0)
     ImageDraw.Draw(m).ellipse([0, 0, 299, 299], fill=255)
     rond.putalpha(m)
