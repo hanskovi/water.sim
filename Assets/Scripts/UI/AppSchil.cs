@@ -4,6 +4,7 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using WaterSim.Besturing;
@@ -55,14 +56,14 @@ namespace WaterSim.UI
         {
             public bool speelbaar, oneindig;
             public float startT;
-            public int scene;                // 0 = kristal met temperatuur, 1 = één molecuul, 2 = twee moleculen met H-brug, 3 = ijsstructuur, 4 = glas en meer
+            public int scene;                // 0 = kristal met temperatuur, 1 = één molecuul, 2 = twee moleculen met H-brug, 3 = ijsstructuur, 4 = glas en meer, 5 = Ontdek
             public LevelInfo(bool s, bool o = true, float t = -10f, int sc = 0) { speelbaar = s; oneindig = o; startT = t; scene = sc; }
         }
         static readonly LevelInfo[] Levels =
         {
             new LevelInfo(true, sc: 1), new LevelInfo(true, sc: 2),
             new LevelInfo(true, true, -10f, 3), new LevelInfo(true, true, -10f), new LevelInfo(true, sc: 4),
-            new LevelInfo(false),
+            new LevelInfo(true, sc: 5),
         };
         static readonly int[] Snelknoppen = { -20, -5, 4, 20, 80 };   // 4 °C: water heeft dan de grootste dichtheid
 
@@ -82,6 +83,8 @@ namespace WaterSim.UI
         bool MolecuulLevel => Levels[level].scene == 1 || Levels[level].scene == 2;
         bool IjsLevel => Levels[level].scene == 3;
         bool MacroLevel => Levels[level].scene == 4;
+        bool OntdekLevel => Levels[level].scene == 5;
+        bool PlatLevel => Levels[level].scene >= 4;      // zonder 3D-beeld
         RectTransform vrijRt;
         int pasCameraAan;              // over zoveel beelden de camera-afstand aanpassen aan het molecuul
         bool laatsteKalotten;
@@ -127,6 +130,7 @@ namespace WaterSim.UI
             level = Mathf.Clamp(PlayerPrefs.GetInt("watersim.level", 2), 0, Levels.Length - 1);
             league = Mathf.Clamp(PlayerPrefs.GetInt("watersim.league", 1), 0, 2);
 
+            Debug.unityLogger.logEnabled = Debug.isDebugBuild;       // in release geen logregels
             if (FindAnyObjectByType<EventSystem>() == null)
                 new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
@@ -207,6 +211,7 @@ namespace WaterSim.UI
             simPagina = Maak("Simulatie", kolom); Vul(simPagina);
             BouwStart();
             BouwSim();
+            if (menuOpen && pagina == Pagina.Start) BouwMenu();
             PasSchermAan();
             ToonPagina(pagina, false);
             if (kristal != null && schuif != null) schuif.SetValueWithoutNotify(kristal.temperatuurOmgeving);   // level 1-3 hebben geen schuif
@@ -422,6 +427,7 @@ namespace WaterSim.UI
             Vul(merkTekst.rectTransform);
             var logo = Tekst(kop.transform, "Logo", "<b>Water.</b><size=72%>sim</size>", 27f, Color.white, TextAlignmentOptions.Left);
             LE(logo.gameObject, flexW: 1f);
+            Menuknop(kop.transform);
             var taal = Glas(kop.transform, "Taal", 8f);
             LE(taal.gameObject, prefW: 62f);
             var tt = Tekst(taal.transform, "Tekst", Teksten.T("taal"), 14f, Color.white, TextAlignmentOptions.Center);
@@ -593,6 +599,7 @@ namespace WaterSim.UI
             var vrij = Maak("Vrij", simPagina);
             LE(vrij.gameObject, flexH: 1f);
             vrijRt = vrij;
+            if (OntdekLevel) { BouwOntdek(vrij); return; }
             if (MacroLevel) BouwMacro(vrij); else Zoomknoppen(vrij);
             if (Levels[level].scene == 0 || Levels[level].scene == 3) VolledigKnoppen(vrij);
             Formulekaart(vrij);
@@ -1355,6 +1362,139 @@ namespace WaterSim.UI
             }
         }
 
+        // ---------- level 6: Ontdek (onderwerpen voor een volgende versie) ----------
+        const int OntdekAantal = 8;
+
+        void BouwOntdek(RectTransform vrij)
+        {
+            var venster = Maak("Ontdek", vrij);
+            Vul(venster, 0f, 4f, 0f, 4f);
+            venster.gameObject.AddComponent<RectMask2D>();
+            var vang = venster.gameObject.AddComponent<Image>(); vang.color = new Color(0f, 0f, 0f, 0.001f);
+            var inhoud = Maak("Inhoud", venster);
+            inhoud.anchorMin = new Vector2(0f, 1f); inhoud.anchorMax = new Vector2(1f, 1f); inhoud.pivot = new Vector2(0.5f, 1f);
+            inhoud.offsetMin = inhoud.offsetMax = Vector2.zero;
+            var kv = Kolom(inhoud, 0, 8);
+            kv.childAlignment = TextAnchor.UpperLeft;
+            inhoud.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var sr = venster.gameObject.AddComponent<ScrollRect>();
+            sr.content = inhoud; sr.viewport = venster; sr.horizontal = false; sr.movementType = ScrollRect.MovementType.Elastic; sr.scrollSensitivity = 20f;
+
+            Tekst(inhoud, "Kop", Teksten.T("ontdek.kop"), 14f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            for (int i = 1; i <= OntdekAantal; i++)
+            {
+                var kaart = Waterglas(inhoud, "Onderwerp " + i, 12f);
+                var kk = Kolom((RectTransform)kaart.transform, 12, 4);
+                kk.childAlignment = TextAnchor.UpperLeft;
+                var kop = Rij(kaart.transform, "Kop", 22f, 8f);
+                var titel = Tekst(kop.transform, "Titel", Teksten.T($"ontdek.{i}.titel"), 15f, Color.white, TextAlignmentOptions.Left, true);
+                LE(titel.gameObject, flexW: 1f);
+                var pil = Vlak(kop.transform, "Binnenkort", Color.white, 8f);
+                Oranje(pil, 8f); pil.raycastTarget = false;
+                var bt = Tekst(pil.transform, "Tekst", Teksten.T("binnenkort"), 11f, Color.white, TextAlignmentOptions.Center, true);
+                Vul(bt.rectTransform, 6, 0, 6, 0);
+                LE(pil.gameObject, prefW: bt.preferredWidth + 16f);
+                Tekst(kaart.transform, "Tekst", Teksten.T($"ontdek.{i}.tekst"), 13f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            }
+        }
+
+        // ---------- menu op het startscherm: taal, over, voortgang wissen ----------
+        bool menuOpen, wissenVragen, overOpen;
+        Image menu;
+
+        void Menuknop(Transform ouder)
+        {
+            var k = Glas(ouder, "Menu", 8f);
+            LE(k.gameObject, prefW: 40f);
+            var rt = Maak("Puntjes", k.transform);
+            Hoek(rt, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24f, 24f));
+            rt.pivot = new Vector2(0.5f, 0.5f); rt.anchoredPosition = Vector2.zero;
+            rt.gameObject.AddComponent<CanvasRenderer>();
+            var t = rt.gameObject.AddComponent<Formuletekening>();
+            t.raycastTarget = false;
+            foreach (float y in new[] { 5f, 12f, 19f }) t.Punt(new Vector2(12f, y), 2.4f, Color.white);   // drie puntjes onder elkaar
+            Knop(k, () => { menuOpen = !menuOpen; wissenVragen = false; Bouw(); });
+        }
+
+        void BouwMenu()
+        {
+            // donkere laag over het startscherm met in het midden een glazen kaart
+            menu = Vlak(veilig, "Menu", new Color(0.01f, 0.05f, 0.09f, 0.72f));
+            Vul(menu.rectTransform);
+            Knop(menu, () => { menuOpen = false; Bouw(); });
+            var kaart = Waterglas(menu.transform, "Kaart", 14f);
+            kaart.rectTransform.anchorMin = new Vector2(0.5f, 0.5f); kaart.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            kaart.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            kaart.rectTransform.sizeDelta = new Vector2(Mathf.Clamp(kolom.rect.width - 20f, 260f, 340f), 0f);
+            var kv = Kolom((RectTransform)kaart.transform, 14, 8);
+            kv.childAlignment = TextAnchor.UpperLeft;
+            kaart.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            Knop(kaart, null);                                     // tik op de kaart sluit het menu niet
+
+            var kop = Rij(kaart.transform, "Kop", 30f, 8f);
+            var titel = Tekst(kop.transform, "Titel", "<b>Water.</b><size=80%>sim</size>", 20f, Color.white);
+            LE(titel.gameObject, flexW: 1f);
+            var sluit = Vlak(kop.transform, "Sluiten", KnopGlas, 8f);
+            LE(sluit.gameObject, prefW: 30f);
+            var x = Tekst(sluit.transform, "x", "×", 20f, Color.white, TextAlignmentOptions.Center);
+            Vul(x.rectTransform, 0, 2, 0, 0);
+            Knop(sluit, () => { menuOpen = false; Bouw(); });
+
+            // taal
+            var rt = Rij(kaart.transform, "Taal", 34f, 6f);
+            foreach (var tl in new[] { Taal.NL, Taal.EN })
+            {
+                var t = tl;
+                var p = Pilknop(rt.transform, t == Taal.NL ? "Nederlands" : "English", () => Teksten.Stel(t));
+                Actief(p.img, p.t, Teksten.Huidig == t);
+            }
+            // over
+            var over = Pilknop(kaart.transform, Teksten.T("menu.over"), () => { overOpen = !overOpen; Bouw(); });
+            LE(over.img.gameObject, prefH: 34f);
+            Actief(over.img, over.t, overOpen);
+            if (overOpen)
+                Tekst(kaart.transform, "Over", string.Format(Teksten.T("menu.over.tekst"), Application.version), 12f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            // voortgang wissen (met bevestiging)
+            if (!wissenVragen)
+            {
+                var w = Pilknop(kaart.transform, Teksten.T("menu.wissen"), () => { wissenVragen = true; Bouw(); });
+                LE(w.img.gameObject, prefH: 34f);
+            }
+            else
+            {
+                Tekst(kaart.transform, "Vraag", Teksten.T("menu.wissen.vraag"), 13f, Color.white, TextAlignmentOptions.TopLeft, false, true);
+                var rw = Rij(kaart.transform, "Bevestig", 34f, 6f);
+                var ja = Pilknop(rw.transform, Teksten.T("menu.ja"), () => { WisVoortgang(); wissenVragen = false; menuOpen = false; Bouw(); });
+                Oranje(ja.img, 8f);
+                Pilknop(rw.transform, Teksten.T("menu.nee"), () => { wissenVragen = false; Bouw(); });
+            }
+        }
+
+        // alles van Water.sim vergeten behalve de taal
+        static void WisVoortgang()
+        {
+            var taal = PlayerPrefs.GetInt("watersim.taal", 0);
+            foreach (var sleutel in new[] { "watersim.level", "watersim.league", "watersim.sterren", "watersim.infoniveau", "watersim.macro",
+                                             "watersim.vloeistof", "watersim.klimaat", "watersim.ijsmassa" })
+                PlayerPrefs.DeleteKey(sleutel);
+            for (int i = 0; i < 6; i++) PlayerPrefs.DeleteKey("watersim.formule." + i);
+            PlayerPrefs.SetInt("watersim.taal", taal);
+            PlayerPrefs.Save();
+        }
+
+        // terugknop van Android (in het Input System de Escape-toets): eerst een open venster dicht, dan terug, dan afsluiten
+        void Terugknop()
+        {
+            var tb = Keyboard.current;
+            if (tb == null || !tb.escapeKey.wasPressedThisFrame) return;
+            if (menuOpen) { menuOpen = false; Bouw(); return; }
+            if (infoOpen) { infoOpen = false; return; }
+            if (klimaatLijstOpen) { klimaatLijstOpen = false; return; }
+            if (volledig) { volledig = false; return; }
+            if (pagina == Pagina.Sim) { ToonPagina(Pagina.Start); return; }
+            Application.Quit();
+        }
+
         void Sterpil(Transform balk)
         {
             var sterPil = Vlak(balk, "Sterren", Color.white, 8f);
@@ -1563,7 +1703,7 @@ namespace WaterSim.UI
 
             Application.targetFrameRate = p == Pagina.Start ? startschermFps : kristal.beeldenPerSeconde;
             // op het startscherm ligt het 3D-kristal stil (de achtergrond dekt alles af): spaart batterij
-            kristal.enabled = p == Pagina.Sim && !MolecuulLevel && !MacroLevel;
+            kristal.enabled = p == Pagina.Sim && !MolecuulLevel && !PlatLevel;
             if (molecuul != null) molecuul.enabled = p == Pagina.Sim && MolecuulLevel;
             if (p == Pagina.Start)
             {
@@ -1573,11 +1713,11 @@ namespace WaterSim.UI
             else
             {
                 var info = Levels[level];
-                if (info.scene == 4)
+                if (info.scene >= 4)
                 {
-                    // level 5: glas en meer (plat getekend), geen 3D-camera nodig
+                    // level 5 (glas, poolkappen, meertje) en 6 (Ontdek): plat getekend, geen 3D-camera nodig
                     if (vliegcamera != null) vliegcamera.enabled = false;
-                    if (meer == null) meer = new WaterSim.Sim.Meer(24, 6, 12);
+                    if (info.scene == 4 && meer == null) meer = new WaterSim.Sim.Meer(24, 6, 12);
                     Bouw();
                     return;
                 }
@@ -1651,6 +1791,7 @@ namespace WaterSim.UI
         {
             if (Screen.safeArea != laatsteSafe || Screen.width != (int)laatsteScherm.x || Screen.height != (int)laatsteScherm.y) PasSchermAan();
             PasKolomAan();
+            Terugknop();
             PasVerloopAan();                                   // ook op het startscherm: daar zet het zich uit
             if (pagina == Pagina.Start) PasGolfAan();
             if (kristal == null || kristal.Model == null) return;
@@ -1680,6 +1821,7 @@ namespace WaterSim.UI
                 }
                 WerkFormuleBij();
             }
+            if (OntdekLevel) return;
             if (MacroLevel)
             {
                 PasVasteHoogtesAan();
@@ -1783,7 +1925,7 @@ namespace WaterSim.UI
         void PasVerloopAan()
         {
             if (verloopBoven == null) return;
-            bool aan = pagina == Pagina.Sim && !MacroLevel && !volledig && vrijRt != null && canvas != null;
+            bool aan = pagina == Pagina.Sim && !PlatLevel && !volledig && vrijRt != null && canvas != null;
             foreach (var v in new[] { verloopBoven, verloopOnder, dekBoven, dekOnder }) if (v.gameObject.activeSelf != aan) v.gameObject.SetActive(aan);
             if (!aan) return;
             vrijRt.GetWorldCorners(vrijHoeken);                   // overlay-canvas: wereld = schermpixels
