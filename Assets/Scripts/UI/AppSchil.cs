@@ -1472,6 +1472,9 @@ namespace WaterSim.UI
             Actief(over.img, over.t, overOpen);
             if (overOpen)
                 Tekst(kaart.transform, "Over", string.Format(Teksten.T("menu.over.tekst"), Application.version), 12f, IJsTekst, TextAlignmentOptions.TopLeft, false, true);
+            // privacystatement van ConceptCraft (verplicht in de app voor Google Play, want AdMob verzamelt gegevens)
+            var ps = Pilknop(kaart.transform, Teksten.T("menu.privacystatement"), () => Application.OpenURL(Teksten.T("menu.privacystatement.url")));
+            LE(ps.img.gameObject, prefH: 34f);
             // privacykeuzes voor advertenties (verplicht te kunnen wijzigen in de EER)
             if (Advertenties.PrivacyKeuzesNodig)
             {

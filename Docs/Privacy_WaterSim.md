@@ -74,9 +74,12 @@ EN — na "…'Ad privacy settings')." toevoegen:
 Bovenaan de datum bijwerken ("Laatst bijgewerkt"). Zet daarna de **URL** van het statement in de Play Console en
 App Store Connect (zie hieronder).
 
-**Nog te doen in de app:** Google Play vraagt de link naar het privacystatement óók ín de app (de AdMob-SDK verzamelt
-gegevens). Water.sim heeft die link nog niet. Zodra de URL bekend is, komt er in het menu (⋮) een knop
-"Privacystatement" / "Privacy statement" die de pagina opent.
+**In de app:** menu (⋮) → "Privacystatement" opent https://conceptcraft.nl/apps/ (NL) of https://conceptcraft.nl/en/
+(EN); het statement staat onderaan die pagina's. Let op: de Engelse versie op /en/ is ouder (14 oktober) dan de
+Nederlandse op /apps/ (28 oktober) — zet de aanvulling van §2 in beide. Komt er een eigen pagina voor het statement,
+pas dan de URL aan in `Teksten.cs` (`menu.privacystatement.url`).
+
+**URL voor de stores:** https://conceptcraft.nl/apps/
 
 ---
 

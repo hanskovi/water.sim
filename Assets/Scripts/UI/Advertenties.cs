@@ -25,7 +25,7 @@ namespace WaterSim.UI
     ///
     /// Gebaseerd op de AdManager van C.chem (toestemming eerst, callbacks op de Unity-thread).
     /// </summary>
-    public class Advertenties : MonoBehaviour
+    public partial class Advertenties : MonoBehaviour
     {
         public static Advertenties Instance { get; private set; }
 
@@ -92,6 +92,7 @@ namespace WaterSim.UI
             lock (hoofdThread) while (hoofdThread.Count > 0) hoofdThread.Dequeue()?.Invoke();
 #if UNITY_EDITOR
             NepBannerBovenop();
+            EigenBannersEditor();
 #endif
         }
 
@@ -233,20 +234,31 @@ namespace WaterSim.UI
                 AgeRestrictedTreatment = AgeRestrictedTreatment.Teen,
                 MaxAdContentRating = MaxAdContentRating.T,
             });
-            MobileAds.Initialize(_ => { ToonBanner(); LaadInterstitial(); });
+            MobileAds.Initialize(_ => { MaakGoogleBanner(); LaadInterstitial(); });
         }
 
-        void ToonBanner()
+        void MaakGoogleBanner()
         {
-            banner?.Destroy();
+            VernietigGoogleBanner();
+            gestartBanner = true;
             var maat = AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
-            banner = new BannerView(BannerId, maat, AdPosition.Bottom);
-            banner.OnBannerAdLoaded += () => OpHoofdThread(() =>
+            var b = new BannerView(BannerId, maat, AdPosition.Bottom);
+            banner = b;
+            b.OnBannerAdLoaded += () => OpHoofdThread(() =>
             {
-                BannerPixels = banner.GetHeightInPixels();
+                if (banner != b) return;                                       // al vervangen door een eigen banner
+                BannerPixels = b.GetHeightInPixels();
                 BannerHoogteBekend?.Invoke(BannerPixels);
+                GoogleBannerGeladen();                                         // telt mee voor de eigen banners
             });
-            banner.LoadAd(new AdRequest());
+            b.LoadAd(new AdRequest());
+        }
+
+        void VernietigGoogleBanner()
+        {
+            if (banner == null) return;
+            banner.Destroy();
+            banner = null;
         }
 
         void LaadInterstitial()
@@ -260,6 +272,9 @@ namespace WaterSim.UI
                 interstitial.OnAdFullScreenContentFailed += _ => { var d = naInterstitial; naInterstitial = null; d?.Invoke(); LaadInterstitial(); };
             });
         }
+#else
+        void MaakGoogleBanner() { }
+        void VernietigGoogleBanner() { }
 #endif
     }
 }
