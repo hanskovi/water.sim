@@ -23,7 +23,7 @@ namespace WaterSim.UI
     ///
     /// Opdrachten (tipbalk, antwoord, check) volgen in fase 4 deel B.
     /// </summary>
-    public class AppSchil : MonoBehaviour
+    public partial class AppSchil : MonoBehaviour
     {
         public Kristal kristal;
         public Vliegcamera vliegcamera;
@@ -604,12 +604,18 @@ namespace WaterSim.UI
             LE(vrij.gameObject, flexH: 1f);
             vrijRt = vrij;
             if (OntdekLevel) { BouwOntdek(vrij); return; }
+            if (quizOpen && !Quizvragen.Heeft(level + 1)) quizOpen = false;
             if (MacroLevel) BouwMacro(vrij); else Zoomknoppen(vrij);
             if (Levels[level].scene == 0 || Levels[level].scene == 3) VolledigKnoppen(vrij);
             Formulekaart(vrij);
             Infovak(vrij);
             if (MacroLevel) { BouwMacropaneel(); return; }
-            if (MolecuulLevel) { BouwMolecuulpaneel(); return; }
+            if (MolecuulLevel)
+            {
+                BouwMolecuulpaneel();
+                if (quizOpen) { onderPaneel.SetActive(false); BouwQuiz(vrij); }   // de quiz krijgt het hele beeld
+                return;
+            }
             if (IjsLevel) { BouwIjspaneel(); return; }
             BouwKristalpaneel();
         }
@@ -974,7 +980,7 @@ namespace WaterSim.UI
             if (nieuw == level) return;
             level = nieuw;
             PlayerPrefs.SetInt("watersim.level", level);
-            infoOpen = false; volledig = false;
+            infoOpen = false; volledig = false; quizOpen = false;
             if (kristal != null) kristal.kalotten = false;     // elk level begint in zijn eigen standaardweergave
             kalottenZetteBlok = false;
             ToonPagina(Pagina.Sim);
@@ -1499,6 +1505,7 @@ namespace WaterSim.UI
             if (tb == null || !tb.escapeKey.wasPressedThisFrame) return;
             if (menuOpen) { menuOpen = false; Bouw(); return; }
             if (infoOpen) { infoOpen = false; return; }
+            if (quizOpen) { NaRonde(SluitQuiz); return; }
             if (klimaatLijstOpen) { klimaatLijstOpen = false; return; }
             if (volledig) { volledig = false; return; }
             if (pagina == Pagina.Sim) { ToonPagina(Pagina.Start); return; }
@@ -1533,6 +1540,7 @@ namespace WaterSim.UI
             schakelaars.Add((lad.img, lad.t, () => molecuul.toonLadingen));
             var bw = Pilknop(r.transform, Teksten.T("beweging"), () => molecuul.beweging = !molecuul.beweging);
             schakelaars.Add((bw.img, bw.t, () => molecuul.beweging));
+            if (Quizvragen.Heeft(level + 1)) Quizknop(r.transform);
             var noot = Tekst(paneel.transform, "Model", Teksten.T("model.molecuul"), 10.5f, new Color(IJsTekst.r, IJsTekst.g, IJsTekst.b, 0.7f), TextAlignmentOptions.Left, false, true);
         }
 
@@ -1717,7 +1725,7 @@ namespace WaterSim.UI
             if (molecuul != null) molecuul.enabled = p == Pagina.Sim && MolecuulLevel;
             if (p == Pagina.Start)
             {
-                volledig = false;
+                volledig = false; quizOpen = false;
                 if (vliegcamera != null) vliegcamera.enabled = false;
             }
             else
@@ -1814,7 +1822,8 @@ namespace WaterSim.UI
             }
             if (vliegcamera != null && vliegcamera.DraaiOm) PasMolecuulcamera(false);
             PasVolledigAan();
-            if (zoomHouder != null && zoomHouder.gameObject.activeSelf == infoOpen) zoomHouder.gameObject.SetActive(!infoOpen);   // niet over het infovak
+            bool zoomWeg = infoOpen || quizOpen;
+            if (zoomHouder != null && zoomHouder.gameObject.activeSelf == zoomWeg) zoomHouder.gameObject.SetActive(!zoomWeg);   // niet over infovak of quiz
             if (infoVak != null && infoVak.gameObject.activeSelf != infoOpen)
             {
                 infoVak.gameObject.SetActive(infoOpen);
@@ -1823,7 +1832,7 @@ namespace WaterSim.UI
             foreach (var k in infoKnoppen) if (k != null) k.color = infoOpen ? Lin(OranjeL) : new Color(1f, 1f, 1f, 0.16f);
             if (formuleKaart != null)
             {
-                bool kaartZichtbaar = toonFormule && !infoOpen && !volledig, knopZichtbaar = !toonFormule && !infoOpen && !volledig;
+                bool kaartZichtbaar = toonFormule && !infoOpen && !volledig && !quizOpen, knopZichtbaar = !toonFormule && !infoOpen && !volledig && !quizOpen;
                 if (formuleKaart.gameObject.activeSelf != kaartZichtbaar || formuleDicht.gameObject.activeSelf != knopZichtbaar)
                 {
                     formuleKaart.gameObject.SetActive(kaartZichtbaar);

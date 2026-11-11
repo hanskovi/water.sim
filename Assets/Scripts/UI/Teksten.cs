@@ -26,6 +26,9 @@ namespace WaterSim.UI
             Gewijzigd?.Invoke();
         }
 
+        /// <summary>Kies de tekst in de huidige taal (voor gegevens die zelf al in twee talen zijn, zoals de quizvragen).</summary>
+        public static string Kies(string nl, string en) => huidig == Taal.EN ? en : nl;
+
         public static string T(string sleutel)
         {
             if (!Lijst.TryGetValue(sleutel, out var v)) return sleutel;
@@ -118,6 +121,19 @@ namespace WaterSim.UI
             ["beweging"] = ("Beweging", "Motion"),
             ["ladingen"] = ("δ+ δ−", "δ+ δ−"),
             ["kanalen"] = ("Kanalen", "Channels"),
+            ["quiz.titel"] = ("Quiz", "Quiz"),
+            ["quiz.start"] = ("Quiz", "Quiz"),
+            ["quiz.vraag"] = ("Vraag {0} van {1}", "Question {0} of {1}"),
+            ["quiz.streak"] = ("Streak {0} · beste {1}", "Streak {0} · best {1}"),
+            ["quiz.goed"] = ("Goed!", "Correct!"),
+            ["quiz.nieuwbeste"] = ("Goed! Nieuwe beste streak!", "Correct! New best streak!"),
+            ["quiz.fout"] = ("Helaas. Het goede antwoord is: {0}", "Not quite. The right answer is: {0}"),
+            ["quiz.controleer"] = ("Controleer", "Check"),
+            ["quiz.volgende"] = ("Volgende", "Next"),
+            ["quiz.klaar"] = ("Ronde klaar: {0} van {1} goed.", "Round finished: {0} of {1} correct."),
+            ["quiz.nogeen"] = ("Nog een ronde", "Another round"),
+            ["quiz.sluiten"] = ("Sluiten", "Close"),
+            ["quiz.invoer"] = ("Typ een getal", "Type a number"),
             ["ontdek.1.titel"] = ("VR: door het ijs vliegen", "VR: fly through the ice"),
             ["ontdek.1.tekst"] = ("Zet een VR-bril op en vlieg tussen de moleculen door de kanalen van ijs.", "Put on a VR headset and fly between the molecules through the channels of ice."),
             ["ontdek.2.titel"] = ("Het Mpemba-effect", "The Mpemba effect"),
