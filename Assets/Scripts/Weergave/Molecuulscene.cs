@@ -121,7 +121,7 @@ namespace WaterSim.Weergave
                     // gradenboog van het midden van het ene H-atoom naar het andere, met het aantal graden er vlak onder;
                     // hoort bij de "uitleg"-laag: verdwijnt samen met de δ's
                     toonHoek = true;
-                    Hoek2D(m);
+                    Hoek2D(m, rO, rH);
                     var bis = ((m.h1 + m.h2) * 0.5f - m.o).normalized;
                     Label(ref lab, m.o + bis * (OH + 0.28f), Hoektekst(), Color.white, 14f);   // net onder het midden van de boog
                     Ladingen(ref lab, m, rO, rH);
@@ -146,7 +146,7 @@ namespace WaterSim.Weergave
                 if (toonLadingen) { Ladingen(ref lab, a, rO, rH); Ladingen(ref lab, b, rO, rH); }
             }
             for (int i = lab; i < labels.Count; i++) labels[i].gameObject.SetActive(false);
-            if (boog2D != null && !toonHoek) boog2D.Zet(null);
+            if (boog2D != null && !toonHoek) boog2D.Zet(null, null);
 
             // straal van alles wat in beeld moet (atomen + ruimte voor de labels)
             float straal = 0f;
@@ -218,19 +218,45 @@ namespace WaterSim.Weergave
 
         // gradenboog: van H-atoom naar H-atoom, als punten op het scherm voor de platte lijn met pijlpunten
         readonly List<Vector2> boogPunten = new List<Vector2>();
-        void Hoek2D(Mol m)
+        readonly List<float> boogZicht = new List<float>();
+        void Hoek2D(Mol m, float rO, float rH)
         {
             if (boog2D == null) return;
             var a = (m.h1 - m.o).normalized; var b = (m.h2 - m.o).normalized;
             const int stukken = 32; float straal = OH;                       // door het midden van beide H-atomen
-            boogPunten.Clear();
+            boogPunten.Clear(); boogZicht.Clear();
+            var oog = cam.transform.position;
             for (int k = 0; k <= stukken; k++)
             {
-                var p = cam.WorldToScreenPoint(m.o + Vector3.Slerp(a, b, k / (float)stukken) * straal);
-                if (p.z <= 0f) { boog2D.Zet(null); return; }
-                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(boog2D.rectTransform, p, null, out var lok)) boogPunten.Add(lok);
+                var w = m.o + Vector3.Slerp(a, b, k / (float)stukken) * straal;
+                var p = cam.WorldToScreenPoint(w);
+                if (p.z <= 0f) { boog2D.Zet(null, null); return; }
+                if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(boog2D.rectTransform, p, null, out var lok)) continue;
+                boogPunten.Add(lok);
+                // ligt dit stuk van de boog achter een atoom (gezien vanaf de camera)? Dan vager. Bij kalotten ligt de boog
+                // binnen het O-atoom: daar laten we hem gewoon zien.
+                float zicht = 1f;
+                if (!kalotten)
+                {
+                    if (cam.orthographic) oog = w - cam.transform.forward * 100f;    // evenwijdige zichtlijnen
+                    zicht = Mathf.Min(zicht, Zicht(oog, w, m.o, rO));
+                    if ((w - m.h1).magnitude > rH) zicht = Mathf.Min(zicht, Zicht(oog, w, m.h1, rH));
+                    if ((w - m.h2).magnitude > rH) zicht = Mathf.Min(zicht, Zicht(oog, w, m.h2, rH));
+                }
+                boogZicht.Add(zicht);
             }
-            boog2D.Zet(boogPunten);
+            boog2D.Zet(boogPunten, boogZicht);
+        }
+
+        // 1 = vrij zichtbaar; lager als de bol (midden c, straal r) tussen het oog en punt p ligt (zachte rand)
+        static float Zicht(Vector3 oog, Vector3 p, Vector3 c, float r)
+        {
+            var d = p - oog; float L = d.magnitude; if (L < 1e-4f) return 1f;
+            d /= L;
+            float t = Vector3.Dot(c - oog, d);
+            if (t <= 0f || t >= L) return 1f;                                  // de bol ligt niet tussen oog en punt
+            float afstand = (c - oog - d * t).magnitude;                       // afstand van het bolmidden tot de zichtlijn
+            return Mathf.Lerp(Hoekboog2D.AchterZicht, 1f, Mathf.SmoothStep(0f, 1f, (afstand - 0.75f * r) / (0.5f * r)));
         }
 
         static string Hoektekst() => ((float)Constanten.HoekHOH).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
@@ -289,14 +315,21 @@ namespace WaterSim.Weergave
     public class Hoekboog2D : MaskableGraphic
     {
         readonly List<Vector2> punten = new List<Vector2>();
+        readonly List<float> zicht = new List<float>();
         public Color lijn = new Color(0.62f, 0.86f, 1f, 1f);
+        /// <summary>Dekking van het deel van de boog dat achter een atoom ligt.</summary>
+        public const float AchterZicht = 0.22f;
 
-        public void Zet(List<Vector2> nieuw)
+        /// <summary>De boog als punten op het scherm, met per punt hoe zichtbaar het is (1 = vrij, lager = achter een atoom).</summary>
+        public void Zet(List<Vector2> nieuw, List<float> nieuwZicht)
         {
-            punten.Clear();
+            punten.Clear(); zicht.Clear();
             if (nieuw != null) punten.AddRange(nieuw);
+            if (nieuwZicht != null) zicht.AddRange(nieuwZicht);
             SetVerticesDirty();
         }
+
+        Color Kleur(int i) { var k = lijn; k.a *= i < zicht.Count ? zicht[i] : 1f; return k; }
 
         protected override void OnPopulateMesh(VertexHelper vh)
         {
@@ -304,21 +337,26 @@ namespace WaterSim.Weergave
             if (punten.Count < 3) return;
             float schaal = Mathf.Min(Screen.width / 390f, Screen.height / 844f);
             float dik = 2.4f * schaal, pijl = 9f * schaal;
-            UI.Tekenhulp.Lijnstuk(vh, punten, dik, lijn, true);
-            Pijlpunt(vh, punten[1], punten[0], pijl, dik);
-            Pijlpunt(vh, punten[punten.Count - 2], punten[punten.Count - 1], pijl, dik);
+            for (int i = 0; i + 1 < punten.Count; i++)
+            {
+                var k = Color.Lerp(Kleur(i), Kleur(i + 1), 0.5f);
+                UI.Tekenhulp.Lijn(vh, punten[i], punten[i + 1], dik, k);
+            }
+            for (int i = 1; i + 1 < punten.Count; i++) UI.Tekenhulp.Schijf(vh, punten[i], dik * 0.5f, Kleur(i), 10);   // ronde knikjes
+            Pijlpunt(vh, punten[1], punten[0], pijl, Kleur(0));
+            Pijlpunt(vh, punten[punten.Count - 2], punten[punten.Count - 1], pijl, Kleur(punten.Count - 1));
         }
 
-        void Pijlpunt(VertexHelper vh, Vector2 van, Vector2 naar, float lengte, float dik)
+        void Pijlpunt(VertexHelper vh, Vector2 van, Vector2 naar, float lengte, Color k)
         {
             var d = (naar - van).normalized;
             if (d.sqrMagnitude < 0.5f) return;
             var n = new Vector2(-d.y, d.x);
             var top = naar + d * lengte * 0.35f;
             int i = vh.currentVertCount;
-            vh.AddVert(top, lijn, Vector4.zero);
-            vh.AddVert(naar - d * lengte * 0.65f + n * lengte * 0.5f, lijn, Vector4.zero);
-            vh.AddVert(naar - d * lengte * 0.65f - n * lengte * 0.5f, lijn, Vector4.zero);
+            vh.AddVert(top, k, Vector4.zero);
+            vh.AddVert(naar - d * lengte * 0.65f + n * lengte * 0.5f, k, Vector4.zero);
+            vh.AddVert(naar - d * lengte * 0.65f - n * lengte * 0.5f, k, Vector4.zero);
             vh.AddTriangle(i, i + 1, i + 2);
         }
     }

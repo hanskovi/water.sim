@@ -1380,7 +1380,8 @@ namespace WaterSim.UI
                 {
                     var (t, d) = meerW.diepteLabels[i];
                     int laag = Mathf.Clamp((int)(d / meer.Diepte * meer.Lagen), 0, meer.Lagen - 1);
-                    t.text = $"{Teksten.Getal(d, "0.#")} m: <b>{Teksten.Graden(meer.T[laag], 1)}</b>";
+                    bool inIjs = d < 0.92 * meer.Ijsdikte;                  // 92 % van het ijs ligt onder de waterlijn
+                    t.text = $"{Teksten.Getal(d, "0.#")} m: <b>{(inIjs ? Teksten.T("meer.inijs") : Teksten.Graden(meer.T[laag], 1))}</b>";
                 }
                 // wat er netto met het ijs gebeurt (gemiddeld over een dag), met de snelheid
                 var tst = meer.Toestand;

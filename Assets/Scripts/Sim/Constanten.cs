@@ -35,6 +35,9 @@ namespace WaterSim.Sim
         public const double WarmteoverdrachtDooi = 10;      // W/(m²·K), lucht → smeltend ijs: smeltwater, verdamping en uitstraling
                                                             // houden het oppervlak koel, dus dooi gaat trager dan vriezen; model
         public const double RotDagen = 2;                   // zoveel dagen flinke dooi en het ijs is helemaal "rot" (zwak, korrelig); model
+        public const double AlbedoMeerijs = 0.6;            // wit meerijs met belletjes (en wat sneeuw): weerkaatst veel zonlicht; model
+        public const double LichtdiepteMeerijs = 0.3;       // m: in wit ijs is het licht na ~30 cm tot 1/e uitgedoofd; model
+        public const double ZonNaarRot = 0.5;               // deel van het zonlicht in het ijs dat tussen de kristallen smelt (rot), niet dunner maakt
         public const double HerstelDagen = 5;               // zoveel dagen vorst en rot ijs is weer sterk; model
 
         // --- Warmte (Binas-waarden, afgerond) ---

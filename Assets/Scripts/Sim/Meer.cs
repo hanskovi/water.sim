@@ -34,9 +34,9 @@ namespace WaterSim.Sim
         /// <summary>Zonlicht op het oppervlak (W/m², daggemiddelde). 0 = geen zon.</summary>
         public double Zon;
         /// <summary>Weerkaatsing van zonlicht door ijs en door water (0 … 1); model.</summary>
-        public double AlbedoIjs = 0.5, AlbedoWater = 0.07;
+        public double AlbedoIjs = Constanten.AlbedoMeerijs, AlbedoWater = 0.07;
         /// <summary>Diepte (m) waarop het licht tot 1/e is uitgedoofd, in ijs en in water; model.</summary>
-        public double LichtdiepteIjs = 0.7, LichtdiepteWater = 0.8;
+        public double LichtdiepteIjs = Constanten.LichtdiepteMeerijs, LichtdiepteWater = 0.8;
         /// <summary>Dikte van de laag die de wind mengt als er geen ijs ligt (m); model.</summary>
         public double Windlaag = 1.5;
         /// <summary>Warmteoverdracht van water naar de onderkant van het ijs (W/(m²·K)); model.</summary>
@@ -130,9 +130,10 @@ namespace WaterSim.Sim
                 {
                     // dooi: de bovenkant is 0 °C en smelt; er komt smeltwater op het ijs. Smeltend ijs neemt minder warmte
                     // op uit de lucht (lagere overdracht), en het wordt eerst rot voordat het verdwijnt.
-                    double qDooi = WarmteoverdrachtDooi * Math.Max(0, tLucht) + opIjs;
+                    // Zonlicht in het ijs smelt voor een deel tussen de kristallen: dat maakt het ijs rot, niet dunner.
+                    double qDooi = WarmteoverdrachtDooi * Math.Max(0, tLucht) + (1 - Constanten.ZonNaarRot) * opIjs;
                     double smelt = Math.Min(Ijsdikte, qDooi * dt / (RhoIjs * Lf));
-                    Rot = Math.Min(1, Rot + dt / (Constanten.RotDagen * 86400.0) * Math.Min(1, qDooi / 50.0));
+                    Rot = Math.Min(1, Rot + dt / (Constanten.RotDagen * 86400.0) * Math.Min(1, (qDooi + Constanten.ZonNaarRot * opIjs) / 50.0));
                     Ijsdikte -= smelt; GesmoltenBoven += smelt;
                     Smeltwater += smelt * RhoIjs / 1000.0;
                     IjsRichting = -1;

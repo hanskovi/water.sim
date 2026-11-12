@@ -528,17 +528,14 @@ namespace WaterSim.UI
             var r = rectTransform.rect;
             if (meer == null || r.width < 40f) return;
             Maten(r, out float boven, out float onder, out float schaal);
-            // dieptelabels: wit op een donker pilletje (altijd leesbaar); nooit over het ijs, dan net eronder
-            float ijsOnder = boven - 0.92f * (float)meer.Ijsdikte * schaal;
-            float vorige = float.MaxValue;
+            // dieptelabels: wit op een donker pilletje (altijd leesbaar), op hun vaste diepte; ligt die in het ijs, dan
+            // staat er "ijs" (zie AppSchil)
             foreach (var (t, diepte) in diepteLabels)
             {
                 if (t == null) continue;
                 var pil = t.transform.parent as RectTransform;
                 if (pil == null) continue;
-                float y = Mathf.Min(boven - diepte * schaal, ijsOnder - 13f);
-                y = Mathf.Min(y, vorige - 22f);                   // niet op elkaar
-                vorige = y;
+                float y = boven - diepte * schaal;
                 pil.anchorMin = pil.anchorMax = Vector2.zero;
                 pil.pivot = new Vector2(1f, 0.5f);
                 pil.sizeDelta = new Vector2(t.preferredWidth + 14f, 19f);

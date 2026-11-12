@@ -270,6 +270,33 @@ namespace WaterSim.Sim
         /// ethaanamine; XPRT: één stof die H-bruggen kan vormen (ook methaanzuur en ethaanzuur) + één apolaire of "lastige" stof
         /// (methaan, butaan, H₂S, aceton).
         /// </summary>
+        /// <summary>
+        /// De zes moleculen van een opdracht (2 kolommen × 3 rijen, om en om de twee stoffen). Kunnen er zo te weinig
+        /// waterstofbruggen gevormd worden (bv. methanol met aceton: te weinig H aan O), dan wordt één molecuul van de
+        /// tweede stof vervangen door water, zodat de opdracht altijd te doen is.
+        /// </summary>
+        public static Molecuul2D[] Opdracht(int niveau, Random rnd)
+        {
+            var (a, b) = Kies(niveau, rnd);
+            var m = new Molecuul2D[6];
+            for (int i = 0; i < 6; i++) m[i] = ((i / 2) + (i % 2)) % 2 == 0 ? a : b;      // rij = i / 2, kolom = i % 2
+            if (MaxBruggen(m) < HBrugRegels.Nodig(niveau)) m[1] = Water;
+            return m;
+        }
+
+        /// <summary>Hoeveel bruggen er hooguit kunnen: het kleinste van het aantal H aan N/O en het aantal vrije plekken op N/O.</summary>
+        public static int MaxBruggen(IReadOnlyList<Molecuul2D> mols)
+        {
+            int geven = 0, ontvangen = 0;
+            foreach (var m in mols)
+                for (int i = 0; i < m.Atomen.Length; i++)
+                {
+                    if (HBrugRegels.IsDonorH(m, i)) geven++;
+                    if (m.Atomen[i] == Element.N || m.Atomen[i] == Element.O) ontvangen += m.VrijeParen(i);
+                }
+            return Math.Min(geven, ontvangen);
+        }
+
         public static (Molecuul2D a, Molecuul2D b) Kies(int niveau, Random rnd)
         {
             if (niveau <= 0) return (Water, rnd.Next(2) == 0 ? Methanol : Ammoniak);

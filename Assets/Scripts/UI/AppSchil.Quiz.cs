@@ -257,19 +257,20 @@ namespace WaterSim.UI
         HBrugRegels.Oordeel[] tekenOordelen;
         bool tekenRegelsOpen, tekenGelukt;
         int tekenPunten;
-        Molecuul2D tekenA, tekenB;
+        Molecuul2D tekenA;                                 // eerste stof (ook: is er een opdracht?)
 
         // 6 moleculen (3 van elke soort) in 2 kolommen × 3 rijen, om en om, met een kleine draai
         void NieuweTekenopdracht()
         {
-            (tekenA, tekenB) = Molecuulbibliotheek.Kies(quizNiveau, quizRnd);
+            var opdracht = Molecuulbibliotheek.Opdracht(quizNiveau, quizRnd);
+            tekenA = opdracht[0];
             tekenMoleculen.Clear(); tekenBruggen.Clear(); tekenOordelen = null; tekenRegelsOpen = false; tekenGelukt = false;
             var mols = new System.Collections.Generic.List<Molecuul2D>();
             var plekken = new System.Collections.Generic.List<(double x, double y)>();
             for (int rij = 0; rij < 3; rij++)
                 for (int kol = 0; kol < 2; kol++)
                 {
-                    mols.Add((rij + kol) % 2 == 0 ? tekenA : tekenB);
+                    mols.Add(opdracht[rij * 2 + kol]);
                     plekken.Add((0.25 + kol * 0.5 + (quizRnd.NextDouble() - 0.5) * 0.06, 1 - (rij + 0.5) / 3 + (quizRnd.NextDouble() - 0.5) * 0.04));
                 }
             // H-brugvormers en -ontvangers naar een buur met een partner gericht
@@ -280,13 +281,22 @@ namespace WaterSim.UI
 
         static string MolNaam(Molecuul2D m) => Teksten.T("mol." + m.Sleutel);
 
+        // de stoffen in de opdracht, elk één keer: "methanol, propanon (aceton) en water"
+        string StofNamen()
+        {
+            var namen = new System.Collections.Generic.List<string>();
+            foreach (var p in tekenMoleculen) { var n = MolNaam(p.Mol); if (!namen.Contains(n)) namen.Add(n); }
+            if (namen.Count <= 1) return namen.Count == 1 ? namen[0] : "";
+            return string.Join(", ", namen.GetRange(0, namen.Count - 1)) + Teksten.T("quiz.teken.en") + namen[namen.Count - 1];
+        }
+
         void BouwTekenopdracht(Transform ouder)
         {
             if (tekenA == null || tekenMoleculen.Count == 0) NieuweTekenopdracht();
             int nodig = HBrugRegels.Nodig(quizNiveau);
             bool gecontroleerd = tekenOordelen != null;
 
-            Tekst(ouder, "Opdracht", string.Format(Teksten.T("quiz.teken.opdracht"), nodig, MolNaam(tekenA), MolNaam(tekenB)),
+            Tekst(ouder, "Opdracht", string.Format(Teksten.T("quiz.teken.opdracht"), nodig, StofNamen()),
                   13.5f, Color.white, TextAlignmentOptions.TopLeft, false, true);
 
             if (tekenRegelsOpen)

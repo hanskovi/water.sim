@@ -118,6 +118,21 @@ namespace WaterSim.Tests
         }
 
         [Test]
+        public void ErKunnenAltijdGenoegBruggenGetekendWorden()
+        {
+            var rnd = new System.Random(11);
+            for (int niv = 0; niv < 3; niv++)
+                for (int k = 0; k < 300; k++)
+                {
+                    var m = Molecuulbibliotheek.Opdracht(niv, rnd);
+                    Assert.That(Molecuulbibliotheek.MaxBruggen(m), Is.GreaterThanOrEqualTo(HBrugRegels.Nodig(niv)), string.Join(", ", Array.ConvertAll(m, x => x.Sleutel)));
+                }
+            // het voorbeeld uit de test: methanol en aceton kan maar 3, met water erbij wel 4
+            var ma = new[] { Molecuulbibliotheek.Methanol, Molecuulbibliotheek.Aceton, Molecuulbibliotheek.Aceton, Molecuulbibliotheek.Methanol, Molecuulbibliotheek.Methanol, Molecuulbibliotheek.Aceton };
+            Assert.That(Molecuulbibliotheek.MaxBruggen(ma), Is.EqualTo(3));
+        }
+
+        [Test]
         public void ElkeOpdrachtIsTeDoen()
         {
             var rnd = new System.Random(3);
