@@ -159,7 +159,7 @@ namespace WaterSim.UI
             snel.Clear(); schakelaars.Clear(); infoKnoppen.Clear(); vasteHoogtes.Clear();
             volledigKnop = volledigBalk = bovenbalk = onderPaneel = null;
             schuif = null; ring = null; kromme = null;      // alleen level 4 bouwt deze opnieuw
-            zoomHouder = null; glasW = null; meerW = null; poolW = null; poolZ = null; luchtSchuif = null;
+            zoomHouder = null; glasW = null; meerW = null; poolW = null; poolZ = null; luchtSchuif = null; klimaatRij = null;
 
             var go = new GameObject("Interface", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             go.transform.SetParent(transform, false);
@@ -1006,6 +1006,7 @@ namespace WaterSim.UI
         int zonStand;                              // 0 = geen zon, 1 = winterzon, 2 = voorjaarszon
         WaterSim.Sim.Klimaat klimaat;              // jaar-modus: lucht en zon van deze plaats
         bool strengeWinter, klimaatLijstOpen;
+        CanvasGroup klimaatRij;                    // landenlijst en "Strenge winter": grijs zolang "Jaar" uit staat
         Image klimaatLijst;
         bool jaarModus, opRots, aanHetSmelten;
         float gesmolten;
@@ -1192,6 +1193,7 @@ namespace WaterSim.UI
 
                 // klimaat: plaats kiezen (opent een lijst) en eventueel een strenge winter
                 var rkl = Rij(paneel.transform, "Klimaat", 32f, 6f);
+                klimaatRij = rkl.gameObject.AddComponent<CanvasGroup>();   // alleen actief als "Jaar" aan staat (zie WerkMacroBij)
                 var kk = Pilknop(rkl.transform, Teksten.T("klimaat." + klimaat.Sleutel), () => klimaatLijstOpen = !klimaatLijstOpen, 1.4f);
                 kk.t.fontSize = 12.5f; kk.t.margin = new Vector4(0f, 0f, 16f, 0f);
                 var kp = Icoon(kk.img.transform, "Pijl", PijlOmlaag(), Color.white);
@@ -1365,6 +1367,13 @@ namespace WaterSim.UI
             {
                 double dag = (startDag + meer.Tijd / 86400.0) % WaterSim.Sim.Seizoen.DagenPerJaar;
                 if (jaarModus) luchtT = (float)klimaat.Lucht(dag, strengeWinter);
+                // landenlijst en strenge winter horen bij "Jaar" (zonder Jaar volgt de lucht de schuif); spiegelbeeld van de schuif
+                if (klimaatRij != null)
+                {
+                    klimaatRij.alpha = jaarModus ? 1f : 0.35f;
+                    klimaatRij.interactable = klimaatRij.blocksRaycasts = jaarModus;
+                    if (!jaarModus) klimaatLijstOpen = false;
+                }
                 if (klimaatLijst != null && klimaatLijst.gameObject.activeSelf != klimaatLijstOpen) klimaatLijst.gameObject.SetActive(klimaatLijstOpen);
                 meer.Zon = zonStand == 0 ? 0 : jaarModus ? klimaat.Zon(dag)
                          : zonStand == 1 ? WaterSim.Sim.Seizoen.ZonWinter : WaterSim.Sim.Seizoen.ZonVoorjaar;
