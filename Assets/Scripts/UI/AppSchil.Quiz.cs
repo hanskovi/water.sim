@@ -264,16 +264,18 @@ namespace WaterSim.UI
         {
             (tekenA, tekenB) = Molecuulbibliotheek.Kies(quizNiveau, quizRnd);
             tekenMoleculen.Clear(); tekenBruggen.Clear(); tekenOordelen = null; tekenRegelsOpen = false; tekenGelukt = false;
+            var mols = new System.Collections.Generic.List<Molecuul2D>();
+            var plekken = new System.Collections.Generic.List<(double x, double y)>();
             for (int rij = 0; rij < 3; rij++)
                 for (int kol = 0; kol < 2; kol++)
                 {
-                    var m = (rij + kol) % 2 == 0 ? tekenA : tekenB;
-                    bool klein = m.Atomen.Length <= 5;
-                    float hoek = klein ? (float)quizRnd.NextDouble() * 360f : ((float)quizRnd.NextDouble() - 0.5f) * 40f + (quizRnd.Next(2) == 0 ? 0f : 180f);
-                    var plek = new Vector2(0.25f + kol * 0.5f + ((float)quizRnd.NextDouble() - 0.5f) * 0.06f,
-                                           1f - (rij + 0.5f) / 3f + ((float)quizRnd.NextDouble() - 0.5f) * 0.04f);
-                    tekenMoleculen.Add(new Tekenveld.Plaatsing { Mol = m, Plek = plek, Hoek = hoek });
+                    mols.Add((rij + kol) % 2 == 0 ? tekenA : tekenB);
+                    plekken.Add((0.25 + kol * 0.5 + (quizRnd.NextDouble() - 0.5) * 0.06, 1 - (rij + 0.5) / 3 + (quizRnd.NextDouble() - 0.5) * 0.04));
                 }
+            // H-brugvormers en -ontvangers naar een buur met een partner gericht
+            var hoeken = Schikking.Richt(mols, plekken, quizRnd);
+            for (int i = 0; i < mols.Count; i++)
+                tekenMoleculen.Add(new Tekenveld.Plaatsing { Mol = mols[i], Plek = new Vector2((float)plekken[i].x, (float)plekken[i].y), Hoek = (float)hoeken[i] });
         }
 
         static string MolNaam(Molecuul2D m) => Teksten.T("mol." + m.Sleutel);

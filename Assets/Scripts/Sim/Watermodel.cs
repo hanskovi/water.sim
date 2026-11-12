@@ -55,9 +55,17 @@ namespace WaterSim.Sim
         readonly int[] latAcc;
         readonly bool[] latRand;
         readonly int[] rangBlok, rangOneindig;      // volgorde van smelten
+        readonly int[] opRangBlok, opRangOneindig;  // omgekeerd: welke plek heeft rang r
+        readonly int[] latBuren;                    // de 4 roosterburen van elke plek (−1 = over de rand van een los blok)
+        readonly int[] kopV, volgendeV;             // celrooster met alleen de vloeibare moleculen (voor het stollen)
+        readonly int[] kopG, volgendeG;             // celrooster met de plekken die nog ijs moeten worden
+        readonly int[] koppel;                      // eindfase van het stollen: welk molecuul hoort bij welke vrije plek (−1 = geen)
+        bool eindfase;
+        int aantalVloeibaar;
         readonly float[] fase, freq;
         readonly float[] lx, ly, lz, vx, vy, vz;      // vloeistof
         readonly float[] terug;                       // 0 → 1: overgang van vloeistof terug naar roosterplek
+        readonly float[] reis;                        // afstand (Å) van die overgang: ver weg gaat het rustiger
         readonly byte[] tel;
         readonly uint[] rndI;                         // eigen toevalsgenerator per molecuul (veilig bij meerdere kernen)
         float tijd;
@@ -77,7 +85,7 @@ namespace WaterSim.Sim
             IJsregels.HAtomen(Rooster, out var hx, out var hy, out var hz, out var acc, out var rand);
             N = Rooster.Aantal;
             Lx = (float)Rooster.Lx; Ly = (float)Rooster.Ly; Lz = (float)Rooster.Lz;
-            Fase = new Fasemodel(startTemperatuur);
+            Fase = new Fasemodel(startTemperatuur) { MaxPlateauDuur = Constanten.MaxPlateauSeconden };
 
             X = new float[N]; Y = new float[N]; Z = new float[N];
             H = new float[6 * N]; Acceptor = new int[2 * N]; Vloeibaar = new bool[N];
@@ -86,7 +94,7 @@ namespace WaterSim.Sim
             fase = new float[3 * N]; freq = new float[3 * N];
             lx = new float[N]; ly = new float[N]; lz = new float[N];
             vx = new float[N]; vy = new float[N]; vz = new float[N];
-            terug = new float[N]; tel = new byte[N]; rndI = new uint[N];
+            terug = new float[N]; reis = new float[N]; tel = new byte[N]; rndI = new uint[N];
             rnd ^= (uint)(zaad * 7919);
 
             for (int i = 0; i < N; i++)
@@ -121,10 +129,37 @@ namespace WaterSim.Sim
                 dI[i] = m + r;
             }
             rangBlok = Rangen(dB); rangOneindig = Rangen(dI);
+            opRangBlok = new int[N]; opRangOneindig = new int[N];
+            for (int i = 0; i < N; i++) { opRangBlok[rangBlok[i]] = i; opRangOneindig[rangOneindig[i]] = i; }
+            // roosterburen: de 2 plekken waar i een H-brug naar geeft, en de 2 die er een naar i geven
+            latBuren = new int[4 * N]; var tellerB = new int[N];
+            for (int i = 0; i < 4 * N; i++) latBuren[i] = -1;
+            for (int i = 0; i < N; i++)
+                for (int k = 0; k < 2; k++)
+                {
+                    int j = latAcc[2 * i + k];
+                    if (j < 0 || rand[2 * i + k]) continue;            // over de rand: alleen een buur in oneindig ijs (zie Buur)
+                    if (tellerB[i] < 4) latBuren[4 * i + tellerB[i]++] = j;
+                    if (tellerB[j] < 4) latBuren[4 * j + tellerB[j]++] = i;
+                }
+            randBuren = new int[4 * N]; var tellerR = new int[N];
+            for (int i = 0; i < 4 * N; i++) randBuren[i] = -1;
+            for (int i = 0; i < N; i++)
+                for (int k = 0; k < 2; k++)
+                {
+                    int j = latAcc[2 * i + k];
+                    if (j < 0 || !rand[2 * i + k]) continue;
+                    if (tellerR[i] < 4) randBuren[4 * i + tellerR[i]++] = j;
+                    if (tellerR[j] < 4) randBuren[4 * j + tellerR[j]++] = i;
+                }
 
             gx = Math.Max(3, (int)(Lx / 3.6f)); gy = Math.Max(3, (int)(Ly / 3.6f)); gz = Math.Max(3, (int)(Lz / 3.6f));
             cx = Lx / gx; cy = Ly / gy; cz = Lz / gz;
             kop = new int[gx * gy * gz]; volgende = new int[N];
+            kopV = new int[gx * gy * gz]; volgendeV = new int[N];
+            kopG = new int[gx * gy * gz]; volgendeG = new int[N];
+            koppel = new int[N]; doel = new int[N];
+            for (int i = 0; i < N; i++) doel[i] = -1;
             buren = new int[N * MaxBuren]; aantalBuren = new byte[N];
             Bovenkant = Ly / 2;
             Stap(0, (float)startTemperatuur);
@@ -139,33 +174,60 @@ namespace WaterSim.Sim
             float bewegingsDt = Beweging ? dt : 0f;
             tijd += bewegingsDt;
 
-            // --- wie is vloeibaar? (op volgorde van het smeltfront) ---
+            // --- wie is vloeibaar? ---
+            // Smelten volgt het smeltfront (vaste volgorde). Stollen gebeurt waar het water is: telkens wordt de vrije
+            // roosterplek ijs die naast bestaand ijs ligt en een vloeibaar molecuul vlak bij zich heeft. Zo groeit het ijs
+            // geleidelijk vanaf een kiem, en vormen de kanalen zich tijdens het stollen (niet pas aan het eind).
             int nVloeibaar = (int)Math.Round(Fase.Gesmolten * N);
-            var rang = Oneindig ? rangOneindig : rangBlok;
-            for (int i = 0; i < N; i++)
+            if (aantalVloeibaar < nVloeibaar)
             {
-                bool moet = rang[i] < nVloeibaar;
-                if (moet && !Vloeibaar[i])
+                var opRang = Oneindig ? opRangOneindig : opRangBlok;
+                for (int r = 0; r < N && aantalVloeibaar < nVloeibaar; r++)
                 {
-                    Vloeibaar[i] = true;
+                    int i = opRang[r];
+                    if (Vloeibaar[i]) continue;
+                    Vloeibaar[i] = true; aantalVloeibaar++;
                     lx[i] = X[i]; ly[i] = Y[i]; lz[i] = Z[i];
                     vx[i] = vy[i] = vz[i] = 0;
                 }
-                else if (!moet && Vloeibaar[i])
+            }
+            else if (aantalVloeibaar > nVloeibaar)
+            {
+                stolWacht += dt;
+                eindfase = aantalVloeibaar <= Math.Max(24, N / 33);
+                if (eindfase) Koppel();
+                // niet te veel tegelijk (gelijkmatig rekenwerk): hooguit 3× zo snel als een plateau van 15 s nodig heeft
+                int perBeeld = Math.Max(4, (int)Math.Ceiling(N * dt / 5f));
+                while (aantalVloeibaar > nVloeibaar && perBeeld-- > 0)
                 {
-                    // Bevriezen: roosterplek i wordt weer ijs. Moleculen zijn niet te onderscheiden, dus de plek wordt
-                    // ingenomen door het vloeibare molecuul dat er het dichtst bij is (zoals aan een echt ijsfront).
-                    // Daarvoor ruilen i en dat molecuul hun vloeistoftoestand: niemand verspringt, niemand reist ver.
-                    int m = DichtstbijzijndeVloeistof(i, rang, nVloeibaar);
-                    if (m >= 0 && m != i) RuilVloeistof(i, m);
-                    Vloeibaar[i] = false; terug[i] = 0f;
+                    VloeistofRaster();
+                    int i = KiesStolplek(out int m);
+                    if (i < 0) break;
+                    // pas bevriezen als het molecuul er vlakbij is; anders even wachten tot het (vloeiend) aankomt
+                    // (loopt het ijs al MaxStolWacht achter, dan niet meer wachten: de achterblijvers schuiven vloeiend naar hun plek)
+                    if (m >= 0 && Afstand2(m, i) > MaxStolAfstand * MaxStolAfstand && stolWacht < MaxStolWacht) break;
+                    // Moleculen zijn niet te onderscheiden: de plek wordt ingenomen door het vloeibare molecuul dat er het
+                    // dichtst bij is. Daarvoor ruilen i en dat molecuul hun vloeistoftoestand: niemand verspringt.
+                    if (m >= 0 && m != i)
+                    {
+                        RuilVloeistof(i, m);
+                        // de vloeistoftoestand van i woont nu in m: koppelingen naar i gaan naar m
+                        if (eindfase) for (int p = 0; p < N; p++) if (koppel[p] == i) koppel[p] = m;
+                    }
+                    if (eindfase) koppel[i] = -1;
+                    doel[i] = -1;
+                    reis[i] = (float)Math.Sqrt(Afstand2(i, i));
+                    Vloeibaar[i] = false; terug[i] = 0f; aantalVloeibaar--;
                 }
             }
             float rhoW = (float)Constanten.DichtheidWater(Math.Max(0, T));
             Bovenkant = Oneindig ? Ly / 2 : -Ly / 2 + Ly * (1f - (float)Fase.Gesmolten * (1f - (float)Constanten.DichtheidIjsBinas / rhoW));
 
             if (nVloeibaar > 0) Vloeistof(bewegingsDt, T);
+            if (aantalVloeibaar > 0 && tOmgeving < 0 && (Fase.IsAanHetSmelten || aantalVloeibaar > nVloeibaar)) VulGaten(dt);
+            if (aantalVloeibaar <= nVloeibaar) stolWacht = 0f;
             IJs(dt, bewegingsDt, T);
+            if (geschoven) { BreekTeLangeBruggen(); geschoven = false; }
             TelBruggen(dt);
         }
 
@@ -184,7 +246,7 @@ namespace WaterSim.Sim
                 int o = 6 * i;
                 if (terug[i] < 1f)
                 {
-                    terug[i] = Math.Min(1f, terug[i] + dt * 1.2f);
+                    terug[i] = Math.Min(1f, terug[i] + dt * Math.Min(1.2f, MaxReisSnelheid / Math.Max(0.1f, reis[i])));
                     float w = terug[i] * terug[i] * (3f - 2f * terug[i]);
                     float ex = sx - lx[i], ey = sy - ly[i], ez = sz - lz[i];
                     if (Oneindig) { ex = Kortst(ex, Lx); ey = Kortst(ey, Ly); ez = Kortst(ez, Lz); }
@@ -211,18 +273,262 @@ namespace WaterSim.Sim
             return j;
         }
 
-        // het vloeibare molecuul dat het dichtst bij roosterplek i is (i zelf telt mee); −1 als er geen is
-        int DichtstbijzijndeVloeistof(int i, int[] rang, int nVloeibaar)
+        readonly int[] randBuren;                   // roosterburen over de rand (alleen in oneindig ijs buren)
+
+        int IJsBuren(int i)
         {
-            int beste = -1; float bd = float.MaxValue;
+            int n = 0;
+            for (int k = 0; k < 4; k++) { int j = latBuren[4 * i + k]; if (j >= 0 && !Vloeibaar[j]) n++; }
+            if (Oneindig) for (int k = 0; k < 4; k++) { int j = randBuren[4 * i + k]; if (j >= 0 && !Vloeibaar[j]) n++; }
+            return n;
+        }
+
+        // celrooster met de vloeibare moleculen op hun huidige plek
+        void VloeistofRaster()
+        {
+            Array.Fill(kopV, -1);
             for (int m = 0; m < N; m++)
             {
                 if (!Vloeibaar[m]) continue;
-                if (m != i && rang[m] >= nVloeibaar) continue;   // ook aan het bevriezen: die zoekt zelf een plek
-                float dx = lx[m] - ox[i], dy = ly[m] - oy[i], dz = lz[m] - oz[i];
-                if (Oneindig) { dx = Kortst(dx, Lx); dy = Kortst(dy, Ly); dz = Kortst(dz, Lz); }
-                float d = dx * dx + dy * dy + dz * dz;
-                if (d < bd) { bd = d; beste = m; }
+                int g = Vak(Cel(lx[m], Lx, cx, gx), Cel(ly[m], Ly, cy, gy), Cel(lz[m], Lz, cz, gz));
+                volgendeV[m] = kopV[g]; kopV[g] = m;
+            }
+        }
+
+        // het vloeibare molecuul dat het dichtst bij (px, py, pz) is, binnen ±straal cellen; −1 als er geen is
+        int NaasteVloeistof(float px, float py, float pz, int straal, out float d2)
+        {
+            int beste = -1; d2 = float.MaxValue;
+            int ci = Cel(px, Lx, cx, gx), cj = Cel(py, Ly, cy, gy), ck = Cel(pz, Lz, cz, gz);
+            for (int a = -straal; a <= straal; a++)
+            {
+                int A = ci + a; if (A < 0 || A >= gx) { if (!Oneindig) continue; A = ((A % gx) + gx) % gx; }
+                for (int b = -straal; b <= straal; b++)
+                {
+                    int B = cj + b; if (B < 0 || B >= gy) { if (!Oneindig) continue; B = ((B % gy) + gy) % gy; }
+                    for (int c = -straal; c <= straal; c++)
+                    {
+                        int C = ck + c; if (C < 0 || C >= gz) { if (!Oneindig) continue; C = ((C % gz) + gz) % gz; }
+                        for (int m = kopV[Vak(A, B, C)]; m >= 0; m = volgendeV[m])
+                        {
+                            float dx = lx[m] - px, dy = ly[m] - py, dz = lz[m] - pz;
+                            if (Oneindig) { dx = Kortst(dx, Lx); dy = Kortst(dy, Ly); dz = Kortst(dz, Lz); }
+                            float d = dx * dx + dy * dy + dz * dz;
+                            if (d < d2) { d2 = d; beste = m; }
+                        }
+                    }
+                }
+            }
+            return beste;
+        }
+
+        /// <summary>
+        /// De vrije roosterplek die nu het best kan bevriezen: naast bestaand ijs (het ijsfront groeit), met een vloeibaar
+        /// molecuul zo dicht mogelijk bij (dat neemt de plek in, <paramref name="molecuul"/>). Is er nog geen ijs, dan
+        /// ontstaat er een kiem waar een molecuul het dichtst bij een roosterplek is.
+        /// </summary>
+        const float StolBuurVoorkeur = 4f;           // Å² voorrang per ijsbuur
+        const float GatStraal = 1.8f, GatSnelheid = 2.5f;   // Å en Å/s
+        const float GatVersnelling = 0.6f;                   // per s: een molecuul op 10 Å schuift 2,5 + 6 Å/s
+        const float MaxStolAfstand = 2.5f, MaxStolWacht = 1f;   // Å; s (daarna bevriest de plek toch)
+        float stolWacht;
+        const float MaxReisSnelheid = 6f;            // Å/s: een lange weg naar de roosterplek wordt een rustige glijbeweging
+
+        float Afstand2(int m, int s)
+        {
+            float dx = ox[s] - lx[m], dy = oy[s] - ly[m], dz = oz[s] - lz[m];
+            if (Oneindig) { dx = Kortst(dx, Lx); dy = Kortst(dy, Ly); dz = Kortst(dz, Lz); }
+            return dx * dx + dy * dy + dz * dz;
+        }
+
+        /// <summary>
+        /// Tijdens het stollen: is er bij een plek die nog ijs moet worden geen watermolecuul in de buurt (een leeg gat,
+        /// omdat vloeibaar water dichter is en klontert), dan schuift het dichtstbijzijnde watermolecuul er rustig naartoe.
+        /// Zo blijft het water verdeeld over de plekken die nog bevriezen, en hoeft aan het eind niemand ver te reizen.
+        /// </summary>
+        void VulGaten(float dt)
+        {
+            // de doelen 10 keer per seconde bepalen (dat zoeken is het dure deel); elk beeld een stapje ernaartoe
+            doelKlok -= dt;
+            if (doelKlok <= 0f) { doelKlok = 0.1f; BepaalDoelen(); }
+            float stap = GatSnelheid * dt;
+            for (int m = 0; m < N; m++)
+            {
+                int s = doel[m];
+                if (s < 0 || !Vloeibaar[m] || !Vloeibaar[s]) continue;
+                float d = (float)Math.Sqrt(Afstand2(m, s));
+                if (d > (eindfase ? 0.3f : GatStraal)) Schuif(m, s, d, stap + GatVersnelling * d * dt);   // ver weg: sneller, maar vloeiend
+            }
+        }
+
+        readonly int[] doel;                         // stollen: naar welke vrije plek een watermolecuul schuift (−1 = geen)
+        float doelKlok;
+        int doelRonde;                               // per ronde zoekt een derde van de moleculen een nieuw doel (zuinig)
+
+        void BepaalDoelen()
+        {
+            // eindfase (de laatste paar procent): elke vrije plek krijgt een eigen molecuul
+            eindfase = aantalVloeibaar <= Math.Max(24, N / 33);
+            if (eindfase)
+            {
+                for (int m = 0; m < N; m++) doel[m] = -1;
+                Koppel(); for (int i = 0; i < N; i++) if (Vloeibaar[i] && koppel[i] >= 0) doel[koppel[i]] = i;
+                return;
+            }
+            doelRonde = (doelRonde + 1) % 3;
+            VloeistofRaster();
+            // 1. watermoleculen die ver van elke vrije plek zitten (bv. in een kanaal van het ijs), schuiven erheen
+            Array.Fill(kopG, -1);
+            for (int i = 0; i < N; i++)
+            {
+                if (!Vloeibaar[i]) continue;
+                int g = Vak(Cel(ox[i], Lx, cx, gx), Cel(oy[i], Ly, cy, gy), Cel(oz[i], Lz, cz, gz));
+                volgendeG[i] = kopG[g]; kopG[g] = i;
+            }
+            void Zoek(int m)
+            {
+                if (m % 3 != doelRonde) return;                       // deze ronde niet aan de beurt: houdt zijn doel
+                doel[m] = -1;
+                if (!Vloeibaar[m]) return;
+                int s = NaastePlek(lx[m], ly[m], lz[m], 1, out float d2);
+                if (s < 0) s = NaastePlek(lx[m], ly[m], lz[m], 3, out d2);
+                // verder weg zoeken we niet (te duur): zo'n molecuul krijgt in de eindfase een eigen plek
+                if (s >= 0 && d2 > GatStraal * GatStraal) doel[m] = s;
+            }
+            if (Parallel && N > 512)
+            {
+                int blokken = Math.Max(1, Environment.ProcessorCount) * 4, stuk = (N + blokken - 1) / blokken;
+                System.Threading.Tasks.Parallel.For(0, blokken, b => { for (int m = b * stuk, e = Math.Min(N, m + stuk); m < e; m++) Zoek(m); });
+            }
+            else for (int m = 0; m < N; m++) Zoek(m);
+            // 2. vrije plekken zonder water in de buurt (het water klontert): het dichtstbijzijnde molecuul schuift erheen
+            for (int i = 0; i < N; i++)
+            {
+                if (!Vloeibaar[i]) continue;
+                int m = NaasteVloeistof(ox[i], oy[i], oz[i], 1, out float d2);
+                if (m < 0) m = NaasteVloeistof(ox[i], oy[i], oz[i], 2, out d2);
+                if (m < 0 || d2 < GatStraal * GatStraal || doel[m] >= 0) continue;
+                doel[m] = i;
+            }
+        }
+
+        // vrije plekken en vloeibare moleculen eerlijk koppelen: kortste paren eerst (gulzig), elk molecuul één keer
+        readonly System.Collections.Generic.List<(float d, int plek, int mol)> paren = new System.Collections.Generic.List<(float, int, int)>();
+        void Koppel()
+        {
+            paren.Clear();
+            for (int i = 0; i < N; i++)
+            {
+                koppel[i] = -1;
+                if (!Vloeibaar[i]) continue;
+                for (int m = 0; m < N; m++)
+                {
+                    if (!Vloeibaar[m]) continue;
+                    paren.Add((Afstand2(m, i), i, m));
+                }
+            }
+            paren.Sort((a, b) => a.d.CompareTo(b.d));
+            var bezet = new System.Collections.Generic.HashSet<int>();
+            foreach (var (d, plek, mol) in paren)
+            {
+                if (koppel[plek] >= 0 || bezet.Contains(mol)) continue;
+                koppel[plek] = mol; bezet.Add(mol);
+            }
+        }
+
+        bool geschoven;
+
+        // na het verschuiven kan een vloeistofbrug te lang worden: die breekt
+        void BreekTeLangeBruggen()
+        {
+            float max2 = BrugAfstand * BrugAfstand;
+            for (int i = 0; i < N; i++)
+                for (int k = 0; k < 2; k++)
+                {
+                    int j = Acceptor[2 * i + k];
+                    if (j < 0 || (!Vloeibaar[i] && !Vloeibaar[j])) continue;    // ijsbruggen blijven
+                    float dx = X[j] - X[i], dy = Y[j] - Y[i], dz = Z[j] - Z[i];
+                    if (Oneindig) { dx = Kortst(dx, Lx); dy = Kortst(dy, Ly); dz = Kortst(dz, Lz); }
+                    if (dx * dx + dy * dy + dz * dz > max2) Acceptor[2 * i + k] = -1;
+                }
+        }
+
+        // molecuul m een stapje richting roosterplek s
+        void Schuif(int m, int s, float d, float stap)
+        {
+            geschoven = true;
+            float dx = ox[s] - lx[m], dy = oy[s] - ly[m], dz = oz[s] - lz[m];
+            if (Oneindig) { dx = Kortst(dx, Lx); dy = Kortst(dy, Ly); dz = Kortst(dz, Lz); }
+            float f = Math.Min(1f, stap / Math.Max(1e-4f, d));
+            lx[m] += dx * f; ly[m] += dy * f; lz[m] += dz * f;
+            if (Oneindig) { lx[m] = Terug(lx[m], Lx); ly[m] = Terug(ly[m], Ly); lz[m] = Terug(lz[m], Lz); }
+        }
+
+        // de vrije roosterplek die het dichtst bij (px, py, pz) is, binnen ±straal cellen; −1 als er geen is
+        int NaastePlek(float px, float py, float pz, int straal, out float d2)
+        {
+            int beste = -1; d2 = float.MaxValue;
+            int ci = Cel(px, Lx, cx, gx), cj = Cel(py, Ly, cy, gy), ck = Cel(pz, Lz, cz, gz);
+            for (int a = -straal; a <= straal; a++)
+            {
+                int A = ci + a; if (A < 0 || A >= gx) { if (!Oneindig) continue; A = ((A % gx) + gx) % gx; }
+                for (int b = -straal; b <= straal; b++)
+                {
+                    int B = cj + b; if (B < 0 || B >= gy) { if (!Oneindig) continue; B = ((B % gy) + gy) % gy; }
+                    for (int c = -straal; c <= straal; c++)
+                    {
+                        int C = ck + c; if (C < 0 || C >= gz) { if (!Oneindig) continue; C = ((C % gz) + gz) % gz; }
+                        for (int s = kopG[Vak(A, B, C)]; s >= 0; s = volgendeG[s])
+                        {
+                            float dx = ox[s] - px, dy = oy[s] - py, dz = oz[s] - pz;
+                            if (Oneindig) { dx = Kortst(dx, Lx); dy = Kortst(dy, Ly); dz = Kortst(dz, Lz); }
+                            float d = dx * dx + dy * dy + dz * dz;
+                            if (d < d2) { d2 = d; beste = s; }
+                        }
+                    }
+                }
+            }
+            return beste;
+        }
+
+        static float Terug(float v, float L) { float h = L * 0.5f; while (v > h) v -= L; while (v < -h) v += L; return v; }
+
+        int KiesStolplek(out int molecuul)
+        {
+            molecuul = -1;
+            if (eindfase)
+            {
+                int b = -1; float bd = float.MaxValue;
+                for (int i = 0; i < N; i++)
+                {
+                    if (!Vloeibaar[i] || koppel[i] < 0) continue;
+                    int m = koppel[i];
+                    float dx = ox[i] - lx[m], dy = oy[i] - ly[m], dz = oz[i] - lz[m];
+                    if (Oneindig) { dx = Kortst(dx, Lx); dy = Kortst(dy, Ly); dz = Kortst(dz, Lz); }
+                    float d = dx * dx + dy * dy + dz * dz;
+                    if (d < bd) { bd = d; b = i; }
+                }
+                if (b >= 0) { molecuul = koppel[b]; return b; }
+            }
+            bool erIsIJs = aantalVloeibaar < N;
+            int beste = -1; float score = float.MaxValue;
+            for (int i = 0; i < N; i++)
+            {
+                if (!Vloeibaar[i]) continue;
+                int buren = IJsBuren(i);
+                if (erIsIJs && buren == 0) continue;
+                int m = NaasteVloeistof(ox[i], oy[i], oz[i], 1, out float d2);
+                if (m < 0) d2 = 1e6f;                                  // geen water vlakbij: alleen als het niet anders kan
+                // plekken met meer ijsburen eerst: dan blijven er geen gaten achter in het ijs (compact front)
+                float sc = d2 - StolBuurVoorkeur * buren;
+                if (sc < score) { score = sc; beste = i; molecuul = m; }
+            }
+            if (beste < 0)                                             // geen plek aan het front (komt bijna niet voor)
+                for (int i = 0; i < N; i++) if (Vloeibaar[i]) { beste = i; break; }
+            if (beste >= 0 && molecuul < 0)
+            {
+                // ver weg zoeken (het hele rooster)
+                molecuul = NaasteVloeistof(ox[beste], oy[beste], oz[beste], Math.Max(gx, Math.Max(gy, gz)), out _);
             }
             return beste;
         }
@@ -235,6 +541,7 @@ namespace WaterSim.Sim
             for (int q = 0; q < 6; q++) (H[6 * a + q], H[6 * b + q]) = (H[6 * b + q], H[6 * a + q]);
             (X[a], X[b]) = (X[b], X[a]); (Y[a], Y[b]) = (Y[b], Y[a]); (Z[a], Z[b]) = (Z[b], Z[a]);
             (tel[a], tel[b]) = (tel[b], tel[a]);
+            (doel[a], doel[b]) = (doel[b], doel[a]);
         }
 
         // ---------- vloeistof ----------

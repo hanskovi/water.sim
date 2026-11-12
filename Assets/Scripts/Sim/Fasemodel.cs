@@ -29,6 +29,17 @@ namespace WaterSim.Sim
         /// </summary>
         public double Overdracht = 1.67;
 
+        /// <summary>
+        /// Langste duur van smelten of stollen (s modeltijd). Bij een kleine temperatuurafstand tot 0 °C zou het plateau
+        /// heel lang duren (bij −4 °C ruim 50 s); de warmte-overdracht wordt dan zoveel groter dat het plateau hooguit deze
+        /// duur heeft. Alles in dat traject gaat even veel sneller, dus de verhoudingen blijven gelijk. Oneindig = uit.
+        /// </summary>
+        public double MaxPlateauDuur = double.PositiveInfinity;
+
+        /// <summary>De warmte-overdracht die bij deze omgeving geldt (zie <see cref="MaxPlateauDuur"/>).</summary>
+        public double OverdrachtBij(double tOmgeving) =>
+            Math.Max(Overdracht, Constanten.Smeltwarmte / (MaxPlateauDuur * Math.Max(1.0, Math.Abs(tOmgeving))));
+
         public Fasemodel(double startTemperatuur) { Enthalpie = EnthalpieBij(startTemperatuur); }
 
         public double Temperatuur => TemperatuurBij(Enthalpie);
@@ -58,7 +69,7 @@ namespace WaterSim.Sim
         {
             if (!IsAanHetSmelten) return double.PositiveInfinity;
             tOmgeving = Math.Max(MinTemperatuur, Math.Min(MaxTemperatuur, tOmgeving));
-            double stroom = Overdracht * tOmgeving;                    // J/(g·s); > 0 smelten, < 0 stollen
+            double stroom = OverdrachtBij(tOmgeving) * tOmgeving;      // J/(g·s); > 0 smelten, < 0 stollen
             if (stroom > 0) return (Constanten.Smeltwarmte - Enthalpie) / stroom;
             if (stroom < 0) return Enthalpie / -stroom;
             return double.PositiveInfinity;
@@ -69,10 +80,10 @@ namespace WaterSim.Sim
         {
             tOmgeving = Math.Max(MinTemperatuur, Math.Min(MaxTemperatuur, tOmgeving));
             int stappen = Math.Max(1, (int)Math.Ceiling(dt / 0.02));
-            double h = dt / stappen;
+            double h = dt / stappen, k = OverdrachtBij(tOmgeving);
             for (int s = 0; s < stappen; s++)
             {
-                Enthalpie += Overdracht * (tOmgeving - Temperatuur) * h;
+                Enthalpie += k * (tOmgeving - Temperatuur) * h;
                 Enthalpie = Math.Max(EnthalpieBij(MinTemperatuur), Math.Min(EnthalpieBij(MaxTemperatuur), Enthalpie));
             }
         }

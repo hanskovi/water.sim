@@ -42,6 +42,14 @@ namespace WaterSim.Sim
         /// <summary>Warmteoverdracht van water naar de onderkant van het ijs (W/(m²·K)); model.</summary>
         public double OverdrachtOnderIjs = 10;
 
+        /// <summary>Warmteoverdracht lucht → ijs tijdens dooi (W/(m²·K)); lager dan bij vorst; model.</summary>
+        public double WarmteoverdrachtDooi = Constanten.WarmteoverdrachtDooi;
+        /// <summary>
+        /// Hoe "rot" het ijs is (0 = sterk, 1 = rot): bij dooi smelt ijs eerst tussen de kristallen en wordt het zwak en
+        /// korrelig, lang voordat het weg is. Neemt toe bij dooi, herstelt langzaam bij vorst. Model.
+        /// </summary>
+        public double Rot;
+
         /// <summary>Smeltwater dat op het ijs staat (m water); alleen voor de weergave.</summary>
         public double Smeltwater;
         /// <summary>Opgeteld sinds de start (m ijs): aangegroeid aan de onderkant, gesmolten aan boven- en onderkant.</summary>
@@ -120,8 +128,11 @@ namespace WaterSim.Sim
                 double qBoven = Warmteoverdracht * (tLucht - 0) + opIjs;      // W/m² naar het ijsoppervlak
                 if (qBoven > 0)
                 {
-                    // dooi: de bovenkant is 0 °C en smelt; er komt smeltwater op het ijs
-                    double smelt = Math.Min(Ijsdikte, qBoven * dt / (RhoIjs * Lf));
+                    // dooi: de bovenkant is 0 °C en smelt; er komt smeltwater op het ijs. Smeltend ijs neemt minder warmte
+                    // op uit de lucht (lagere overdracht), en het wordt eerst rot voordat het verdwijnt.
+                    double qDooi = WarmteoverdrachtDooi * Math.Max(0, tLucht) + opIjs;
+                    double smelt = Math.Min(Ijsdikte, qDooi * dt / (RhoIjs * Lf));
+                    Rot = Math.Min(1, Rot + dt / (Constanten.RotDagen * 86400.0) * Math.Min(1, qDooi / 50.0));
                     Ijsdikte -= smelt; GesmoltenBoven += smelt;
                     Smeltwater += smelt * RhoIjs / 1000.0;
                     IjsRichting = -1;
@@ -135,6 +146,7 @@ namespace WaterSim.Sim
                     Ijsdikte += groei; GegroeidOnder += groei;
                     Smeltwater = 0;                                            // bevriest weer (vereenvoudigd)
                     IjsRichting = 1;
+                    Rot = Math.Max(0, Rot - dt / (Constanten.HerstelDagen * 86400.0));
                 }
                 Absorbeer(doorIjs, dt);
                 // water dat warmer is dan 0 °C smelt het ijs van onderen
@@ -142,7 +154,7 @@ namespace WaterSim.Sim
                 double onder = Math.Min(Ijsdikte, qWater * dt / (RhoIjs * Lf));
                 Ijsdikte -= onder; GesmoltenOnder += onder;
                 T[0] -= onder * RhoIjs * Lf / (C * dz);
-                if (Ijsdikte <= 1e-6) { Ijsdikte = 0; Smeltwater = 0; }
+                if (Ijsdikte <= 1e-6) { Ijsdikte = 0; Smeltwater = 0; Rot = 0; }
             }
             else
             {

@@ -31,6 +31,11 @@ namespace WaterSim.Sim
         // --- Warmtegeleiding (Binas) ---
         public const double WarmtegeleidingIjs = 2.2;       // W/(m·K), bij 0 °C
         public const double WarmteoverdrachtMeer = 35;      // W/(m²·K), lucht ↔ oppervlak van het meer; model (wind, uitstraling, verdamping)
+        public const double MaxPlateauSeconden = 15;        // level 4: smelten of stollen duurt hooguit zo lang (model, s)
+        public const double WarmteoverdrachtDooi = 10;      // W/(m²·K), lucht → smeltend ijs: smeltwater, verdamping en uitstraling
+                                                            // houden het oppervlak koel, dus dooi gaat trager dan vriezen; model
+        public const double RotDagen = 2;                   // zoveel dagen flinke dooi en het ijs is helemaal "rot" (zwak, korrelig); model
+        public const double HerstelDagen = 5;               // zoveel dagen vorst en rot ijs is weer sterk; model
 
         // --- Warmte (Binas-waarden, afgerond) ---
         public const double Smeltwarmte = 334;              // J/g bij 0 °C

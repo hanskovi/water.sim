@@ -123,6 +123,35 @@ namespace WaterSim.Tests
         }
     
         [Test]
+        public void BijStollenGroeitHetIJsGeleidelijkEnReistNiemandVer()
+        {
+            // traject +5 → −4 °C: het ijs groeit waar het water is (vanaf een kiem, aan het front), dus bijna geen molecuul
+            // hoeft ver naar zijn roosterplek, ook niet aan het eind van het traject
+            var m = Vloeibaar(true, 5f);
+            var was = m.Vloeibaar.ToArray();
+            int ver = 0, halverwege = 0; double plateau = 0, achter = 0;
+            for (int s = 0; s < 1600 && (m.Fase.Gesmolten > 0 || m.Vloeibaar.Any(v => v)); s++)
+            {
+                m.Stap(0.05f, -4f);
+                if (m.Fase.IsAanHetSmelten) plateau += 0.05; else if (m.Fase.Gesmolten <= 0) achter += 0.05;
+                for (int i = 0; i < m.N; i++)
+                {
+                    if (!was[i] || m.Vloeibaar[i]) continue;                     // net bevroren: hoe ver is de roosterplek?
+                    float dx = Watermodel.Kortst(m.X[i] - (float)m.Rooster.X[i], m.Lx), dy = Watermodel.Kortst(m.Y[i] - (float)m.Rooster.Y[i], m.Ly), dz = Watermodel.Kortst(m.Z[i] - (float)m.Rooster.Z[i], m.Lz);
+                    if (Math.Sqrt(dx * dx + dy * dy + dz * dz) > 3.5) ver++;
+                }
+                was = m.Vloeibaar.ToArray();
+                if (halverwege == 0 && m.Fase.Gesmolten < 0.5) halverwege = m.Vloeibaar.Count(v => !v);
+            }
+            Assert.That(m.Vloeibaar.Any(v => v), Is.False, "alles bevroren");
+            Assert.That(plateau, Is.LessThanOrEqualTo(Constanten.MaxPlateauSeconden + 1), "stollen duurt hooguit ~15 s");
+            Assert.That(achter, Is.LessThan(2), "het ijs loopt hooguit even achter op het plateau");
+            Assert.That(halverwege, Is.GreaterThan(m.N / 3), "halverwege het plateau is al een flink deel ijs");
+            // de enkele moleculen die toch van verder komen (uit een kanaal van het ijs) glijden rustig naar hun plek
+            Assert.That(ver, Is.LessThan(m.N / 50), $"hooguit 2 % komt van verder dan 3,5 Å ({ver} van {m.N})");
+        }
+
+        [Test]
         public void BijBevriezenReistGeenMolecuulVerEnZijnErGeenLangeBruggen()
         {
             var m = new Watermodel(5, 3, 3, 1, -5) { Parallel = false };

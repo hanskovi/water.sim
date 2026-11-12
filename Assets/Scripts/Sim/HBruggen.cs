@@ -90,6 +90,79 @@ namespace WaterSim.Sim
         public static int Nodig(int niveau) => niveau <= 0 ? 2 : niveau == 1 ? 3 : 4;
     }
 
+    /// <summary>
+    /// Draait de moleculen van de tekenopdracht zo dat hun H-brugvormers (H aan N of O) en -ontvangers (N of O) naar een
+    /// buurmolecuul wijzen dat daar een partner voor heeft. Zo zijn de bruggen goed te tekenen (vooral met aceton en de
+    /// zuren). Lange moleculen liggen bij voorkeur ongeveer liggend, dan passen ze in hun vak.
+    /// </summary>
+    public static class Schikking
+    {
+        /// <summary>Hoek (graden, tegen de klok in) per molecuul; plekken in dezelfde eenheden in x en y.</summary>
+        public static double[] Richt(IReadOnlyList<Molecuul2D> mols, IReadOnlyList<(double x, double y)> plekken, Random rnd)
+        {
+            int n = mols.Count;
+            var hoek = new double[n];
+            for (int i = 0; i < n; i++) hoek[i] = rnd.NextDouble() * 360;
+            var volgorde = new int[n];
+            for (int i = 0; i < n; i++) volgorde[i] = i;
+            for (int ronde = 0; ronde < 4; ronde++)
+            {
+                for (int k = n - 1; k > 0; k--) { int j = rnd.Next(k + 1); (volgorde[k], volgorde[j]) = (volgorde[j], volgorde[k]); }
+                foreach (int i in volgorde)
+                {
+                    double beste = hoek[i], bs = double.MinValue;
+                    for (int c = 0; c < 36; c++)
+                    {
+                        double h = c * 10 + rnd.NextDouble() * 6 - 3;
+                        double sc = Score(mols, plekken, hoek, i, h) + rnd.NextDouble() * 0.02;
+                        if (sc > bs) { bs = sc; beste = h; }
+                    }
+                    hoek[i] = beste;
+                }
+            }
+            return hoek;
+        }
+
+        // hoe goed molecuul i onder hoek h zijn polaire atomen naar passende buren richt (en of het past in zijn vak)
+        static double Score(IReadOnlyList<Molecuul2D> mols, IReadOnlyList<(double x, double y)> plek, double[] hoek, int i, double h)
+        {
+            var m = mols[i];
+            Midden(m, out double mx, out double my);
+            double c = Math.Cos(h * Math.PI / 180), s = Math.Sin(h * Math.PI / 180);
+            double score = 0, x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+            for (int a = 0; a < m.Atomen.Length; a++)
+            {
+                double vx = m.X[a] - mx, vy = m.Y[a] - my;
+                double rx = c * vx - s * vy, ry = s * vx + c * vy;
+                x0 = Math.Min(x0, rx); x1 = Math.Max(x1, rx); y0 = Math.Min(y0, ry); y1 = Math.Max(y1, ry);
+                bool donor = HBrugRegels.IsDonorH(m, a), acceptor = m.Atomen[a] == Element.N || m.Atomen[a] == Element.O;
+                if (!donor && !acceptor) continue;
+                double L = Math.Sqrt(rx * rx + ry * ry);
+                if (L < 1e-6) continue;
+                for (int j = 0; j < mols.Count; j++)
+                {
+                    if (j == i) continue;
+                    bool partner = (donor && mols[j].IsAcceptor) || (acceptor && mols[j].IsDonor);
+                    if (!partner) continue;
+                    double dx = plek[j].x - plek[i].x, dy = plek[j].y - plek[i].y, d = Math.Sqrt(dx * dx + dy * dy);
+                    double cos = (rx * dx + ry * dy) / (L * d);
+                    if (cos > 0) score += cos * cos / (d * d);
+                }
+            }
+            // lange moleculen liggend: een staand molecuul moet kleiner getekend worden
+            double breed = x1 - x0, hoog = y1 - y0;
+            if (m.Atomen.Length > 6) score -= 4.0 * Math.Max(0, hoog - 2.4) / Math.Max(1, breed);
+            return score;
+        }
+
+        public static void Midden(Molecuul2D m, out double mx, out double my)
+        {
+            double x0 = double.MaxValue, x1 = double.MinValue, y0 = double.MaxValue, y1 = double.MinValue;
+            for (int a = 0; a < m.Atomen.Length; a++) { x0 = Math.Min(x0, m.X[a]); x1 = Math.Max(x1, m.X[a]); y0 = Math.Min(y0, m.Y[a]); y1 = Math.Max(y1, m.Y[a]); }
+            mx = (x0 + x1) / 2; my = (y0 + y1) / 2;
+        }
+    }
+
     /// <summary>De moleculen voor de tekenopdracht, met de keuze per niveau.</summary>
     public static class Molecuulbibliotheek
     {
@@ -174,11 +247,28 @@ namespace WaterSim.Sim
         public static readonly Molecuul2D Ethaanamine = Amine("ethaanamine", 2);
         public static readonly Molecuul2D Methaan = Alkaan("methaan", 1);
         public static readonly Molecuul2D Butaan = Alkaan("butaan", 4);
+        // carbonzuren: H–C(=O)–O–H en CH3–C(=O)–O–H
+        public static readonly Molecuul2D Methaanzuur = new Molecuul2D("methaanzuur",
+            new[] { (C, 0.0, 0.0), (H, -1.0, 0.0), (O, 0.6, 1.04), (O, 0.6, -1.04), (H, 1.55, -1.04) },
+            new[] { (0, 1, 1), (0, 2, 2), (0, 3, 1), (3, 4, 1) });
+        public static readonly Molecuul2D Ethaanzuur = Zuur("ethaanzuur");
+
+        static Molecuul2D Zuur(string sleutel)
+        {
+            var at = new List<(Element, double, double)>(); var bi = new List<(int, int, int)>();
+            CH3(at, bi, 0, 0);
+            int c = at.Count; at.Add((C, 1.2, 0)); bi.Add((0, c, 1));
+            at.Add((O, 1.8, 1.04)); bi.Add((c, c + 1, 2));
+            at.Add((O, 1.8, -1.04)); bi.Add((c, c + 2, 1));
+            at.Add((H, 2.75, -1.04)); bi.Add((c + 2, c + 3, 1));
+            return new Molecuul2D(sleutel, at.ToArray(), bi.ToArray());
+        }
 
         /// <summary>
         /// Kiest de twee soorten moleculen voor een opdracht:
         /// onderbouw: water + methanol of ammoniak; bovenbouw: water + één van methanol, ammoniak, ethanol, methaanamine,
-        /// ethaanamine; XPRT: één stof die H-bruggen kan vormen + één apolaire of "lastige" stof (methaan, butaan, H₂S, aceton).
+        /// ethaanamine; XPRT: één stof die H-bruggen kan vormen (ook methaanzuur en ethaanzuur) + één apolaire of "lastige" stof
+        /// (methaan, butaan, H₂S, aceton).
         /// </summary>
         public static (Molecuul2D a, Molecuul2D b) Kies(int niveau, Random rnd)
         {
@@ -188,7 +278,7 @@ namespace WaterSim.Sim
                 var keus = new[] { Methanol, Ammoniak, Ethanol, Methaanamine, Ethaanamine };
                 return (Water, keus[rnd.Next(keus.Length)]);
             }
-            var polair = new[] { Water, Methanol, Ethanol, Propanol, Butanol, Ammoniak, Methaanamine, Ethaanamine };
+            var polair = new[] { Water, Methanol, Ethanol, Propanol, Butanol, Ammoniak, Methaanamine, Ethaanamine, Methaanzuur, Ethaanzuur };
             var anders = new[] { Methaan, Butaan, Waterstofsulfide, Aceton };
             return (polair[rnd.Next(polair.Length)], anders[rnd.Next(anders.Length)]);
         }

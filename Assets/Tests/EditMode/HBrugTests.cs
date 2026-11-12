@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using WaterSim.Sim;
 using B = WaterSim.Sim.HBrugRegels.Brug;
@@ -71,6 +73,48 @@ namespace WaterSim.Tests
             Assert.That(Molecuulbibliotheek.Waterstofsulfide.IsDonor, Is.False, "H₂S: schoolnorm geen H-brug");
             var r = HBrugRegels.Beoordeel(new[] { w, ac }, new[] { new B { Van = 0, H = 1, Doel = 1, Naar = Eerste(ac, Element.O) } });
             Assert.That(r[0], Is.EqualTo(O.Goed));
+        }
+
+        [Test]
+        public void ZurenGevenEnOntvangen()
+        {
+            foreach (var z in new[] { Molecuulbibliotheek.Methaanzuur, Molecuulbibliotheek.Ethaanzuur })
+            {
+                Assert.That(z.IsDonor && z.IsAcceptor, Is.True, z.Sleutel);
+                var mols = new[] { z, z };
+                int oh = -1, oDubbel = -1;
+                for (int a = 0; a < z.Atomen.Length; a++) if (HBrugRegels.IsDonorH(z, a)) oh = a;
+                foreach (var (a, b, orde) in z.Bindingen) if (orde == 2) oDubbel = z.Atomen[a] == Element.O ? a : b;
+                var o = HBrugRegels.Beoordeel(mols, new[] { new HBrugRegels.Brug { Van = 0, H = oh, Doel = 1, Naar = oDubbel } });
+                Assert.That(o[0], Is.EqualTo(HBrugRegels.Oordeel.Goed), z.Sleutel + ": O–H naar C=O");
+            }
+        }
+
+        [Test]
+        public void PolaireAtomenWijzenNaarEenPartner()
+        {
+            // 6 moleculen in 2 kolommen × 3 rijen, om en om water en aceton: de O van aceton wijst naar een watermolecuul
+            var rnd = new System.Random(5);
+            var w = Molecuulbibliotheek.Water; var ac = Molecuulbibliotheek.Aceton;
+            var mols = new List<Molecuul2D>(); var plek = new List<(double, double)>();
+            for (int rij = 0; rij < 3; rij++) for (int kol = 0; kol < 2; kol++) { mols.Add((rij + kol) % 2 == 0 ? w : ac); plek.Add((0.25 + kol * 0.5, 1 - (rij + 0.5) / 3)); }
+            var hoek = Schikking.Richt(mols, plek, rnd);
+            int o = Array.IndexOf(ac.Atomen, Element.O);
+            for (int i = 0; i < 6; i++)
+            {
+                if (mols[i] != ac) continue;
+                Schikking.Midden(ac, out double mx, out double my);
+                double c = Math.Cos(hoek[i] * Math.PI / 180), s = Math.Sin(hoek[i] * Math.PI / 180);
+                double vx = ac.X[o] - mx, vy = ac.Y[o] - my, rx = c * vx - s * vy, ry = s * vx + c * vy;
+                double besteCos = -1;
+                for (int j = 0; j < 6; j++)
+                {
+                    if (mols[j] != w) continue;
+                    double dx = plek[j].Item1 - plek[i].Item1, dy = plek[j].Item2 - plek[i].Item2;
+                    besteCos = Math.Max(besteCos, (rx * dx + ry * dy) / (Math.Sqrt(rx * rx + ry * ry) * Math.Sqrt(dx * dx + dy * dy)));
+                }
+                Assert.That(besteCos, Is.GreaterThan(0.8), "de O van aceton wijst naar een watermolecuul");
+            }
         }
 
         [Test]

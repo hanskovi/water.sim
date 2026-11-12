@@ -280,10 +280,13 @@ namespace WaterSim.UI
         readonly float[] zicht = new float[MaxSchaatsers];
         float laatsteTijd;
 
+        /// <summary>True als er ijs ligt waar niemand op mag (te dun, of rot door de dooi): dan staat het gevarenbord.</summary>
+        public bool Gevaarlijk { get; private set; }
+
         /// <summary>
-        /// Schaatsers volgens de ijsdikte (richtlijn): &lt; 5 cm niemand (bordje), 5–10 cm één voorzichtige schaatser,
-        /// 10–15 cm een paar, vanaf 15 cm een toertocht in een lint. Bij dooi is ijs minder sterk ("rot" ijs):
-        /// dan gelden de grenzen 3 cm hoger, dus onder ≈ 8 cm gaat iedereen eraf.
+        /// Schaatsers volgens de ijsdikte (richtlijn): &lt; 5 cm niemand (gevarenbord), 5–10 cm één voorzichtige schaatser,
+        /// 10–15 cm een paar, vanaf 15 cm een toertocht in een lint. Bij dooi is ijs minder sterk: het wordt "rot"
+        /// (zie Meer.Rot). Dan gelden de grenzen hoger: 3 cm bij beginnende dooi, tot 15 cm bij helemaal rot ijs.
         /// </summary>
         void Schaatsers(VertexHelper vh, float x0, float x1, float ijs, float t)
         {
@@ -291,10 +294,12 @@ namespace WaterSim.UI
             double cm = meer.Ijsdikte * 100;
             var tst = meer.Toestand;
             bool dooi = meer.Smeltwater > 0.0005 || tst == Meer.IJstoestand.SmeltBoven || tst == Meer.IJstoestand.SmeltOnder || tst == Meer.IJstoestand.SmeltBeide;
-            double nodig = dooi ? 3 : 0;                                   // bij dooi 3 cm extra marge
+            double nodig = System.Math.Max(dooi ? 3 : 0, 15 * meer.Rot);    // extra marge voor zwak (rot) ijs
             bool toertocht = cm >= 15 + nodig;
             int aantal = cm < 5 + nodig ? 0 : cm < 10 + nodig ? 1 : cm < 15 + nodig ? 3 : 9;
-            if (meer.Ijsdikte > 0.003 && aantal == 0) Bordje(vh, new Vector2(x1 - 22f, ijs));
+            Gevaarlijk = meer.Ijsdikte > 0.003 && aantal == 0;
+            if (Gevaarlijk) Gevarenbord(vh, new Vector2(x1 - 22f, ijs));
+            Doorzakker(vh, x0, x1, ijs, t);
             float breed = x1 - x0;
             for (int i = 0; i < MaxSchaatsers; i++)
             {
@@ -349,15 +354,89 @@ namespace WaterSim.UI
             }
         }
 
-        // verbodsbord aan de kant: rode rand, witte balk
-        void Bordje(VertexHelper vh, Vector2 voet)
+        // gevarenbord aan de kant: rode driehoek met wit vlak en een uitroepteken
+        void Gevarenbord(VertexHelper vh, Vector2 voet)
         {
             var paal = new Color(0.85f, 0.88f, 0.9f, 1f);
-            Tekenhulp.Lijn(vh, voet, voet + new Vector2(0f, 14f), 1.6f, paal);
-            var m = voet + new Vector2(0f, 20f);
-            Tekenhulp.Schijf(vh, m, 7f, new Color(0.85f, 0.2f, 0.17f, 1f), 18);
-            Tekenhulp.Schijf(vh, m, 5f, Color.white, 18);
-            Tekenhulp.Lijn(vh, m + new Vector2(-3.5f, 0f), m + new Vector2(3.5f, 0f), 2.2f, new Color(0.85f, 0.2f, 0.17f, 1f));
+            var rood = new Color(0.85f, 0.2f, 0.17f, 1f);
+            Tekenhulp.Lijn(vh, voet, voet + new Vector2(0f, 13f), 1.6f, paal);
+            var m = voet + new Vector2(0f, 19f);                       // zwaartepunt van de driehoek
+            Driehoek(vh, m + new Vector2(0f, 10f), m + new Vector2(-9f, -5.5f), m + new Vector2(9f, -5.5f), rood);
+            Driehoek(vh, m + new Vector2(0f, 6.2f), m + new Vector2(-5.8f, -3.6f), m + new Vector2(5.8f, -3.6f), Color.white);
+            var zwart = new Color(0.1f, 0.1f, 0.12f, 1f);
+            Tekenhulp.Lijn(vh, m + new Vector2(0f, 3.4f), m + new Vector2(0f, -0.6f), 1.5f, zwart);
+            Tekenhulp.Schijf(vh, m + new Vector2(0f, -2.2f), 0.85f, zwart, 8);
+        }
+
+        // ---------- af en toe zakt er een schaatser door het gevaarlijke ijs ----------
+        // Hij schaatst het ijs op, zakt erdoor tot aan zijn schouders (hoofd boven water), en kruipt op zijn buik terug
+        // over het spoor waarlangs hij kwam (daar hield het ijs hem): het advies als je door het ijs zakt.
+        const float WakEerst = 10f, WakTussen = 55f;            // seconden gevaarlijk ijs tot de eerste, en daartussen (gemiddeld)
+        float wakStart = -1f, volgendeWak = -1f, wakX;
+
+        void Doorzakker(VertexHelper vh, float x0, float x1, float ijs, float t)
+        {
+            bool kan = Gevaarlijk && meer.Ijsdikte >= 0.01;
+            if (!kan && wakStart < 0f) { volgendeWak = -1f; return; }
+            if (volgendeWak < 0f) volgendeWak = t + WakEerst + Random.Range(0f, 6f);
+            if (wakStart < 0f && t >= volgendeWak)
+            {
+                wakStart = t;
+                wakX = Mathf.Lerp(x0, x1, Random.Range(0.35f, 0.6f));
+            }
+            if (wakStart < 0f) return;
+            float f = t - wakStart;
+            const float Aan = 4f, Val = 0.4f, Water = 3.6f, Kruip = 4f, Weg = 4f, Na = 5f;
+            if (f > Aan + Val + Water + Kruip + Weg + Na || meer.Ijsdikte <= 0.003)
+            {
+                wakStart = -1f; volgendeWak = t + WakTussen * Random.Range(0.75f, 1.3f);
+                return;
+            }
+            // het wak: een gat in het ijs met water erin, en een paar scheuren; verdwijnt langzaam weer
+            if (f >= Aan)
+            {
+                float a = Mathf.Clamp01((Aan + Val + Water + Kruip + Weg + Na - f) / Na);
+                var water = Kleur(meer.T[0]) * 0.75f; water.a = a;
+                Blok(vh, wakX - 9f, ijs - 5f, wakX + 9f, ijs + 0.5f, water);
+                var scheur = new Color(0.55f, 0.7f, 0.8f, a);
+                Tekenhulp.Lijn(vh, new Vector2(wakX - 9f, ijs), new Vector2(wakX - 17f, ijs + 1.2f), 0.9f, scheur);
+                Tekenhulp.Lijn(vh, new Vector2(wakX + 9f, ijs), new Vector2(wakX + 15f, ijs - 0.8f), 0.9f, scheur);
+                Tekenhulp.Lijn(vh, new Vector2(wakX + 9f, ijs), new Vector2(wakX + 19f, ijs + 0.6f), 0.9f, scheur);
+            }
+            var k = vis;
+            if (f < Aan)                                            // schaatst het ijs op, naar de plek van het wak
+            {
+                float x = Mathf.Lerp(x0 - 10f, wakX, f / Aan);
+                Schaatser(vh, new Vector2(x, ijs), 1, t * 2.6f, false, 1f, false);
+            }
+            else if (f < Aan + Val + Water)                         // in het wak: zakt tot zijn schouders, zwaait met zijn armen
+            {
+                float zak = Mathf.Clamp01((f - Aan) / Val);
+                float hoofd = Mathf.Lerp(16f, 4f, zak);
+                var schouder = new Vector2(wakX, ijs + hoofd - 4f);
+                Tekenhulp.Schijf(vh, new Vector2(wakX, ijs + hoofd), 2.6f, k, 12);
+                float zwaai = Mathf.Sin(t * 9f) * 2f;
+                Tekenhulp.Lijnstuk(vh, new[] { schouder, new Vector2(wakX - 11f, ijs + 1.5f + zwaai) }, 1.8f, k, true);
+                Tekenhulp.Lijnstuk(vh, new[] { schouder, new Vector2(wakX + 11f, ijs + 1.5f - zwaai) }, 1.8f, k, true);
+            }
+            else if (f < Aan + Val + Water + Kruip)                 // kruipt op zijn buik terug, de kant op waar hij vandaan kwam
+            {
+                float g = (f - Aan - Val - Water) / Kruip;
+                float x = Mathf.Lerp(wakX - 2f, wakX - 34f, g);         // hoofd links (vooraan)
+                float kr = Mathf.Sin(t * 7f);
+                var schouder = new Vector2(x + 3f, ijs + 2f);
+                var heup = new Vector2(x + 11f, ijs + 1.8f);
+                Tekenhulp.Schijf(vh, new Vector2(x, ijs + 2.8f), 2.4f, k, 12);
+                Tekenhulp.Lijnstuk(vh, new[] { schouder, heup }, 2.6f, k, true);
+                Tekenhulp.Lijnstuk(vh, new[] { schouder, new Vector2(x - 5f + 2f * kr, ijs + 0.8f) }, 1.6f, k, true);
+                Tekenhulp.Lijnstuk(vh, new[] { heup, new Vector2(heup.x + 8f, ijs + 0.8f + Mathf.Max(0f, kr)) }, 2f, k, true);
+            }
+            else if (f < Aan + Val + Water + Kruip + Weg)           // staat op en loopt voorzichtig weg
+            {
+                float g = (f - Aan - Val - Water - Kruip) / Weg;
+                float x = Mathf.Lerp(wakX - 34f, x0 - 10f, g);
+                Schaatser(vh, new Vector2(x, ijs), -1, t * 1.6f, false, 1f - g * 0.3f, false);
+            }
         }
 
         // bovenkant van het ijs plus het smeltwater (waar het ijslabel op staat)
@@ -547,6 +626,12 @@ namespace WaterSim.UI
         public Color lucht = new Color(0.8f, 0.92f, 0.95f, 1f), berg = new Color(0.46f, 0.77f, 0.84f, 1f), sneeuw = Color.white;
         public Color zee = new Color(0.06f, 0.38f, 0.66f, 1f), zeeDonker = new Color(0.04f, 0.3f, 0.55f, 1f), ijsZij = new Color(0.66f, 0.87f, 0.92f, 1f);
         public TextMeshProUGUI lTitelLand, lTitelZee, lLand, lZee;
+        /// <summary>−1: beide plaatjes onder elkaar; 0: alleen landijs; 1: alleen zee-ijs (het hele vlak, in een afgerond masker).</summary>
+        public int deel = -1;
+        /// <summary>Dunne oranje rand om het plaatje (als dit ijs smelt of gesmolten is).</summary>
+        public bool rand;
+        public Color randKleur = new Color(0.95f, 0.45f, 0.25f, 1f);
+        public float randStraal = 12f, randDikte = 2.5f;
 
         /// <summary>De twee plaatjes (lokale coördinaten), zodat de labels erbij kunnen.</summary>
         public Rect Land { get; private set; }
@@ -559,14 +644,38 @@ namespace WaterSim.UI
             vh.Clear();
             var r = rectTransform.rect;
             if (r.width < 80f || r.height < 120f) return;
+            float t = Time.time;
+            if (deel >= 0)
+            {
+                if (deel == 0) { Land = r; TekenLand(vh, r, t); Plaats(lTitelLand, new Vector2(r.xMin + 10f, r.yMax - 12f), r, 0f); }
+                else { Zee = r; TekenZee(vh, r, t); Plaats(lTitelZee, new Vector2(r.xMin + 10f, r.yMax - 12f), r, 0f); }
+                if (rand) RondeRand(vh, r);
+                return;
+            }
             float gat = 8f, h = (r.height - gat) * 0.5f;
             Land = new Rect(r.xMin, r.yMin + h + gat, r.width, h);
             Zee = new Rect(r.xMin, r.yMin, r.width, h);
-            float t = Time.time;
             TekenLand(vh, Land, t);
             TekenZee(vh, Zee, t);
             Plaats(lTitelLand, new Vector2(Land.xMin + 10f, Land.yMax - 12f), r, 0f);
             Plaats(lTitelZee, new Vector2(Zee.xMin + 10f, Zee.yMax - 12f), r, 0f);
+        }
+
+        // dunne rand langs de afgeronde hoeken van het masker (net binnen de rand, zodat het masker hem niet afsnijdt)
+        void RondeRand(VertexHelper vh, Rect r)
+        {
+            float d = randDikte * 0.5f, R = Mathf.Max(0f, randStraal - d);
+            var a = new Rect(r.xMin + d, r.yMin + d, r.width - 2f * d, r.height - 2f * d);
+            var pad = new List<Vector2>();
+            Vector2[] middens = { new Vector2(a.xMax - R, a.yMax - R), new Vector2(a.xMin + R, a.yMax - R), new Vector2(a.xMin + R, a.yMin + R), new Vector2(a.xMax - R, a.yMin + R) };
+            for (int h = 0; h < 4; h++)
+                for (int k = 0; k <= 8; k++)
+                {
+                    float hoek = (h * 90f + k * 90f / 8f) * Mathf.Deg2Rad;
+                    pad.Add(middens[h] + new Vector2(Mathf.Cos(hoek), Mathf.Sin(hoek)) * R);
+                }
+            pad.Add(pad[0]);
+            Tekenhulp.Lijnstuk(vh, pad, randDikte, randKleur, true);
         }
 
         void TekenLand(VertexHelper vh, Rect P, float t)

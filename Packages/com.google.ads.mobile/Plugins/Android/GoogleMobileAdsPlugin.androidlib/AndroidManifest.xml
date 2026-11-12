@@ -4,7 +4,7 @@
   <uses-permission android:name="android.permission.INTERNET" />
   <application>
     <uses-library android:required="false" android:name="org.apache.http.legacy" />
-    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6923727980694793~7640918889" />
+    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6923727980694793~8310442615" />
     <meta-data android:name="com.google.unity.ads.UNITY_VERSION" android:value="6000.3.11f1" />
   </application>
 </manifest>

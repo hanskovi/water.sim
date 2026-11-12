@@ -73,6 +73,20 @@ namespace WaterSim.Tests
         }
 
         [Test]
+        public void DooiMaaktHetIJsRotVoordatHetWegIs()
+        {
+            var m = new Meer(24, 6, 4);
+            for (int d = 0; d < 25; d++) m.Stap(Dag, -10);
+            double voor = m.Ijsdikte;
+            Assert.That(m.Rot, Is.EqualTo(0), "na vorst is het ijs sterk");
+            for (int d = 0; d < 2; d++) m.Stap(Dag, 5);
+            Assert.That(m.Rot, Is.GreaterThan(0.5), "na twee dagen dooi is het ijs rot");
+            Assert.That(m.Ijsdikte, Is.GreaterThan(voor - 0.05), "maar het ligt er nog: dooi bij +5 °C kost hooguit een paar cm per dag");
+            for (int d = 0; d < 10; d++) m.Stap(Dag, -5);
+            Assert.That(m.Rot, Is.LessThan(0.2), "na een periode vorst herstelt het ijs");
+        }
+
+        [Test]
         public void EenJaarGeeftWinterijsEnZomerspronglaag()
         {
             var m = new Meer(24, 6, 12);
