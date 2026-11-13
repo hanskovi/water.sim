@@ -7,7 +7,11 @@ FM = os.path.join(HIER, "../../../Assets/Fonts/Ubuntu/Ubuntu-Medium.ttf")
 FR = os.path.join(HIER, "../../../Assets/Fonts/Ubuntu/Ubuntu-Regular.ttf")
 FB = os.path.join(HIER, "../../../Assets/Fonts/Ubuntu/Ubuntu-Bold.ttf")
 icoon = Image.open(os.path.join(HIER, "../../../Assets/Icoon/icoon_1024.png")).convert("RGBA")
-VLIEG, MEER = os.path.join(HIER, "schermen/scherm_1.png"), os.path.join(HIER, "schermen/scherm_3.png")
+def schermen(taal):
+    """De twee telefoons in de header: vliegen door ijs (1) en het meertje (3), in de taal van de header als die er is."""
+    m = os.path.join(HIER, "schermen" if taal == "nl" else "schermen_" + taal)
+    if not os.path.exists(os.path.join(m, "scherm_1.png")): m = os.path.join(HIER, "schermen")
+    return os.path.join(m, "scherm_1.png"), os.path.join(m, "scherm_3.png")
 BLAUW, TEAL, ORANJE = (91, 194, 255), (90, 210, 200), (242, 138, 85)
 LICHT = (185, 220, 245)
 
@@ -92,7 +96,9 @@ for taal, t in T.items():
         sch = Image.new("RGBA", (W, H), (0, 0, 0, 0)); m = Image.new("L", p.size, 0); m.paste(p.getchannel("A"))
         sch.paste((0, 0, 0, 150), (sx + 6, sy + 10), m)
         im.alpha_composite(sch.filter(ImageFilter.GaussianBlur(10))); im.alpha_composite(p.crop((0, 0, p.width, min(p.height, H - sy))), (sx, sy))
-    tel(MEER, 520, 80, 0.40); tel(VLIEG, 720, 36, 0.40)
+    VLIEG, MEER = schermen(taal)
+    sv = 0.40 * Image.open(os.path.join(HIER, "schermen/scherm_1.png")).height / Image.open(VLIEG).height   # zelfde hoogte als de NL-schermen
+    tel(MEER, 520, 80, sv); tel(VLIEG, 720, 36, sv)
     os.makedirs(os.path.join(HIER, "header"), exist_ok=True)
     im.convert("RGB").save(os.path.join(HIER, f"header/googleplay_feature_graphic_1024x500_{taal}.png"))
 

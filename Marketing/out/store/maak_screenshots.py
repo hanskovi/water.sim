@@ -15,13 +15,14 @@ TEKSTEN = {
         ("De waterstofbrug", "δ+ trekt aan δ−, in 3D"),
         ("Teken zelf waterstofbruggen", "quiz met streaks · 3 niveaus"),
         ("En er komt meer", "Mpemba, onderkoeling, sneeuwvlokken …")],
+ # Engelse reeks: deels andere schermen dan de Nederlandse (level 1 en kalotten in plaats van water bij 4 °C en Ontdek)
  "en": [("Fly through ice", "molecule by molecule, with every hydrogen bond"),
         ("Why does ice float?", "the open honeycomb of ice: 0.917 g/cm³"),
         ("A pond through the year", "11 places on Earth · when can you go skating?"),
-        ("Melting and freezing", "water is heaviest at 4 °C"),
+        ("The water molecule", "104.5°, δ+ and δ−: why water is a dipole"),
         ("The hydrogen bond", "δ+ attracts δ−, in 3D"),
-        ("Draw hydrogen bonds yourself", "quiz with streaks · 3 levels"),
-        ("And there is more to come", "Mpemba, supercooling, snowflakes …")]}
+        ("Draw hydrogen bonds yourself", "with instant feedback · quiz with streaks"),
+        ("Space-filling or ball-and-stick", "from −20 to +80 °C")]}
 IJS = {1, 2, 4}          # ijs en water: koele blauwe gloed
 MEER = {3}               # meertje: blauw-groen
 QUIZ = {6}               # quiz: warme oranje gloed (de oranje knoppen van de app)
