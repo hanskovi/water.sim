@@ -26,7 +26,9 @@ TEKSTEN = {
 IJS = {1, 2, 4}          # ijs en water: koele blauwe gloed
 MEER = {3}               # meertje: blauw-groen
 QUIZ = {6}               # quiz: warme oranje gloed (de oranje knoppen van de app)
-FORMATEN = {"appstore_6.9": (1320, 2868), "googleplay": (1080, 1920)}
+# App Store Connect (nov 2026): "iPhone with Dynamic Island (medium display)" vraagt 1206 × 2622 (of 1179 × 2556);
+# de 6,9"-reeks blijft erbij voor als dat vak terugkomt
+FORMATEN = {"appstore_6.3": (1206, 2622), "appstore_6.9": (1320, 2868), "googleplay": (1080, 1920)}
 
 
 def kleuren(k):
