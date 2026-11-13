@@ -18,7 +18,7 @@ MonoBehaviour:
   enableGradleBuildPreProcessor: 1
   disableOptimizeInitialization: 0
   disableOptimizeAdLoading: 0
-  userTrackingUsageDescription: Water.sim is free thanks to ads. Your device ID is only used to show ads that suit you better. You will not see more ads, just more relevant ones.
+  userTrackingUsageDescription: 
   userLanguage: en
   overrideDefaultGmaAndroidSdk: 0
   selectedGmaAndroidSdk: 0
