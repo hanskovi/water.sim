@@ -11,8 +11,9 @@ TEKSTEN = {
         ("Het ijskristal", "elk molecuul aan vier buren · een honingraat met lege kanalen", 2),
         ("Een meertje door het jaar", "11 plaatsen op aarde · wanneer kun je schaatsen?", 3),
         ("De waterstofbrug", "δ+ trekt aan δ−, in 3D", 5)],
+ # Engelse reeks: andere schermen dan de Nederlandse (level 3 vliegen, level 4 ijsblok, meertje, H-brug)
  "en": [("Fly through ice", "molecule by molecule, with every hydrogen bond", 1),
-        ("The ice crystal", "each molecule bonded to four neighbours · a honeycomb with empty channels", 2),
+        ("Why does ice float?", "the open honeycomb of ice: 0.917 g/cm³", 2),
         ("A pond through the year", "11 places on Earth · when can you go skating?", 3),
         ("The hydrogen bond", "δ+ attracts δ−, in 3D", 5)]}
 STAAND, LIGGEND = (2064, 2752), (2752, 2064)
